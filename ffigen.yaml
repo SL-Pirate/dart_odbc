@@ -1,0 +1,7 @@
+name: SQL
+description: Bindings for ODBC
+output: "lib/generated/sql.dart"
+headers:
+  entry-points:
+    - "headers/sql.h"
+    - "headers/sqlext.h"

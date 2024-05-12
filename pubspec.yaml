@@ -1,0 +1,16 @@
+name: dart_odbc
+description: ODBC api for dart .
+version: 1.0.0
+repository: https://github.com/SL-Pirate/dart-odbc
+publish_to: 'pub.dev'
+
+environment:
+  sdk: '>=3.0.0'
+
+dependencies:
+  ffi: ^2.1.2
+
+dev_dependencies:
+  ffigen: ^12.0.0
+  lints: ^3.0.0
+  test: ^1.24.0

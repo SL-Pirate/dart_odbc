@@ -1,6 +1,6 @@
-name: SQL
+name: LibODBC
 description: Bindings for ODBC
-output: "lib/api/sql.dart"
+output: "lib/ffi/libodbc.dart"
 headers:
   entry-points:
     - "headers/sql.h"

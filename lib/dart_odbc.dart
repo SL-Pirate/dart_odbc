@@ -4,8 +4,7 @@
 library dart_odbc;
 
 import 'dart:ffi';
-
-import 'package:dart_odbc/api/sql.dart';
+import 'package:dart_odbc/ffi/libodbc.dart';
 import 'package:ffi/ffi.dart';
 
 /// DartOdbc class
@@ -16,9 +15,9 @@ class DartOdbc {
   /// The [pathToDriver] parameter is the path to the ODBC driver.
   /// The [version] parameter is the Open Database Connectivity standard version
   /// to be used. The default value is [SQL_OV_ODBC3_80] which is the latest
-  /// Definitions for these values can be found in the [SQL] class.
+  /// Definitions for these values can be found in the [LibODBC] class.
   DartOdbc(String pathToDriver, {int version = SQL_OV_ODBC3_80})
-      : _sql = SQL(DynamicLibrary.open(pathToDriver)) {
+      : _sql = LibODBC(DynamicLibrary.open(pathToDriver)) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
@@ -48,7 +47,7 @@ class DartOdbc {
       ..free(sqlNullHandle);
   }
 
-  final SQL _sql;
+  final LibODBC _sql;
   SQLHANDLE _hEnv = nullptr;
   SQLHDBC _hConn = nullptr;
 

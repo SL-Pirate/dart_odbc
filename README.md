@@ -36,7 +36,7 @@ This package is inspired by the original [odbc](https://pub.dev/packages/odbc) (
 
 ### Accessing low level API
 
-- Since this package is at its early stage, most advanced functionalities are not implemented or tested yet. In case you need more functionality, the direct access to the `ODBC` driver can be obtained by importing the `SQL` class.
+- Since this package is at its early stage, most advanced functionalities are not implemented or tested yet. In case you need more functionality, the direct access to the `ODBC` driver can be obtained by importing the `LibODBC` class from `ffi/libodbc.dart`.
 
 - For more information on the `ODBC` api go to [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc?view=sql-server-ver16)
 

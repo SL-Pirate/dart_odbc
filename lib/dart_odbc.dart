@@ -1,3 +1,6 @@
+// ignore_for_file: unnecessary_statements
+
+/// Dart ODBC
 library dart_odbc;
 
 import 'dart:ffi';
@@ -5,15 +8,19 @@ import 'dart:ffi';
 import 'package:dart_odbc/api/sql.dart';
 import 'package:ffi/ffi.dart';
 
+/// DartOdbc class
+/// This is the base class that will be used to interact with the ODBC driver.
 class DartOdbc {
-  final SQL _sql;
-  SQLHANDLE hEnv;
-  SQLHDBC hConn;
-
+  /// DartOdbc constructor
+  /// This constructor will initialize the ODBC environment and connection.
+  /// The [pathToDriver] parameter is the path to the ODBC driver.
+  /// The [version] parameter is the Open Database Connectivity standard version
+  /// to be used. The default value is [SQL_OV_ODBC3_80] which is the latest
+  /// Definitions for these values can be found in the [SQL] class.
   DartOdbc(String pathToDriver, {int version = SQL_OV_ODBC3_80})
       : _sql = SQL(DynamicLibrary.open(pathToDriver)),
-        hEnv = calloc.allocate(sizeOf<SQLHENV>()),
-        hConn = calloc.allocate(sizeOf<SQLHDBC>()) {
+        _hEnv = calloc.allocate(sizeOf<SQLHENV>()),
+        _hConn = calloc.allocate(sizeOf<SQLHDBC>()) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
@@ -27,9 +34,9 @@ class DartOdbc {
             SQL_ERROR)
         ? throw Exception('Failed to allocate environment handle')
         : null;
-    hEnv = pHEnv.value;
+    _hEnv = pHEnv.value;
     _sql.SQLSetEnvAttr(
-              hEnv,
+              _hEnv,
               SQL_ATTR_ODBC_VERSION,
               Pointer.fromAddress(sqlOvOdbc.address),
               0,
@@ -39,18 +46,27 @@ class DartOdbc {
         : null;
   }
 
+  final SQL _sql;
+  SQLHANDLE _hEnv;
+  SQLHDBC _hConn;
+
+  /// Connect to a database
+  /// The [dsn] parameter is the Data Source Name.
+  /// This is the name you gave when setting up the ODBC manager.
+  /// The [username] parameter is the username to connect to the database.
+  /// The [password] parameter is the password to connect to the database.
   void connect({
     required String dsn,
     required String username,
     required String password,
   }) {
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
-    _sql.SQLAllocHandle(SQL_HANDLE_DBC, hEnv, pHConn) == SQL_ERROR
+    _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn) == SQL_ERROR
         ? throw Exception('Failed to allocate connection handle')
         : null;
-    hConn = pHConn.value;
+    _hConn = pHConn.value;
     _sql.SQLConnectW(
-              hConn,
+              _hConn,
               dsn.toNativeUtf16().cast(),
               dsn.length,
               username.toNativeUtf16().cast(),
@@ -63,9 +79,14 @@ class DartOdbc {
         : null;
   }
 
-  execute(String query) {
+  /// Execute a query
+  /// The [query] parameter is the SQL query to execute.
+  /// This function will return a list of maps where each map represents a row
+  /// in the result set. The keys in the map are the column names and the values
+  /// are the column values.
+  List<Map<String, dynamic>> execute(String query) {
     final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
-    _sql.SQLAllocHandle(SQL_HANDLE_STMT, hConn, pHStmt) == SQL_ERROR
+    _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt) == SQL_ERROR
         ? throw Exception('Failed to allocate statement handle')
         : null;
     final hStmt = pHStmt.value;
@@ -102,8 +123,11 @@ class DartOdbc {
               SQL_ERROR
           ? throw Exception('Failed to get column name')
           : null;
-      columnNames.add(String.fromCharCodes(
-          columnName.asTypedList(columnNameLength.value * 2)));
+      columnNames.add(
+        String.fromCharCodes(
+          columnName.asTypedList(columnNameLength.value * 2),
+        ),
+      );
     }
 
     final rows = <Map<String, dynamic>>[];

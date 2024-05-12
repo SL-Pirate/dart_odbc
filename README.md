@@ -5,6 +5,8 @@ This package is inspired by the original [odbc](https://pub.dev/packages/odbc) (
 
 ## This package is still in its early development stage and is not recommended for production
 
+[![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
+
 ## Usage
 
 - Instanciate the ODBC class by providing the path to the odbc driver on the host machine

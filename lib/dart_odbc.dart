@@ -18,9 +18,7 @@ class DartOdbc {
   /// to be used. The default value is [SQL_OV_ODBC3_80] which is the latest
   /// Definitions for these values can be found in the [SQL] class.
   DartOdbc(String pathToDriver, {int version = SQL_OV_ODBC3_80})
-      : _sql = SQL(DynamicLibrary.open(pathToDriver)),
-        _hEnv = calloc.allocate(sizeOf<SQLHENV>()),
-        _hConn = calloc.allocate(sizeOf<SQLHDBC>()) {
+      : _sql = SQL(DynamicLibrary.open(pathToDriver)) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
@@ -44,11 +42,15 @@ class DartOdbc {
             SQL_ERROR
         ? throw Exception('Failed to set environment attribute')
         : null;
+    calloc
+      ..free(sqlOvOdbc)
+      ..free(pHEnv)
+      ..free(sqlNullHandle);
   }
 
   final SQL _sql;
-  SQLHANDLE _hEnv;
-  SQLHDBC _hConn;
+  SQLHANDLE _hEnv = nullptr;
+  SQLHDBC _hConn = nullptr;
 
   /// Connect to a database
   /// The [dsn] parameter is the Data Source Name.
@@ -77,6 +79,7 @@ class DartOdbc {
             SQL_ERROR
         ? throw Exception('Failed to connect to database')
         : null;
+    calloc.free(pHConn);
   }
 
   /// Execute a query
@@ -128,6 +131,11 @@ class DartOdbc {
           columnName.asTypedList(columnNameLength.value * 2),
         ),
       );
+
+      // free memory
+      calloc
+        ..free(columnName)
+        ..free(columnNameLength);
     }
 
     final rows = <Map<String, dynamic>>[];
@@ -155,11 +163,20 @@ class DartOdbc {
         row[columnNames[i - 1]] = String.fromCharCodes(
           columnValue.asTypedList(columnValueLength.value * 2),
         );
+
+        // free memory
+        calloc
+          ..free(columnValue)
+          ..free(columnValueLength);
       }
+
       rows.add(row);
     }
 
+    // free memory
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+    calloc.free(columnCount);
+
     return rows;
   }
 }

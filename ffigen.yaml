@@ -1,6 +1,6 @@
 name: SQL
 description: Bindings for ODBC
-output: "lib/generated/sql.dart"
+output: "lib/api/sql.dart"
 headers:
   entry-points:
     - "headers/sql.h"

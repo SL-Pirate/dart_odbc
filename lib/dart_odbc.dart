@@ -2,7 +2,7 @@ library dart_odbc;
 
 import 'dart:ffi';
 
-import 'package:dart_odbc/generated/sql.dart';
+import 'package:dart_odbc/api/sql.dart';
 import 'package:ffi/ffi.dart';
 
 class DartOdbc {

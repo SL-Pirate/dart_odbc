@@ -13,3 +13,8 @@
 ## 1.1.0+1
 
 - Implemented sanitization of sql queries using prepared statements
+
+## 1.1.1+1
+
+- Made setting up OSBC version optional.
+- Verified functionality with Oracle

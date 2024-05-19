@@ -53,7 +53,7 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 TODO:
 
 - [X] Implement query sanitization
-- [ ] Do more testing on different databases
+- [X] Do more testing on different databases
   - [X] MS SQL Server
-  - [ ] Oracle server
+  - [X] Oracle server
 - [ ] Improve documentation

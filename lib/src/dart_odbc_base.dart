@@ -13,10 +13,10 @@ class DartOdbc {
   /// The [version] parameter is the Open Database Connectivity standard version
   /// to be used. The default value is [SQL_OV_ODBC3_80] which is the latest
   /// Definitions for these values can be found in the [LibODBC] class.
-  DartOdbc(String pathToDriver, {int version = SQL_OV_ODBC3_80})
+  DartOdbc(String pathToDriver, {int? version})
       : _sql = LibODBC(DynamicLibrary.open(pathToDriver)) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
-      ..value = version;
+      ..value = version ?? 0;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
       ..value = SQL_NULL_HANDLE;
     final pHEnv = calloc.allocate<SQLHANDLE>(sizeOf<SQLHANDLE>());
@@ -26,18 +26,25 @@ class DartOdbc {
         Pointer.fromAddress(sqlNullHandle.address),
         pHEnv,
       ),
+      operationType: SQL_HANDLE_ENV,
+      handle: pHEnv.value,
       onException: HandleException(),
     );
     _hEnv = pHEnv.value;
-    tryOdbc(
-      _sql.SQLSetEnvAttr(
-        _hEnv,
-        SQL_ATTR_ODBC_VERSION,
-        Pointer.fromAddress(sqlOvOdbc.address),
-        0,
-      ),
-      onException: EnvironmentAllocationException(),
-    );
+
+    if (version != null) {
+      tryOdbc(
+        _sql.SQLSetEnvAttr(
+          _hEnv,
+          SQL_ATTR_ODBC_VERSION,
+          Pointer.fromAddress(sqlOvOdbc.address),
+          0,
+        ),
+        handle: _hEnv,
+        operationType: SQL_HANDLE_ENV,
+        onException: EnvironmentAllocationException(),
+      );
+    }
     calloc
       ..free(sqlOvOdbc)
       ..free(pHEnv)
@@ -61,6 +68,8 @@ class DartOdbc {
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
+      handle: _hEnv,
+      operationType: SQL_HANDLE_DBC,
       onException: HandleException(),
     );
     _hConn = pHConn.value;
@@ -77,6 +86,8 @@ class DartOdbc {
         cPassword,
         password.length,
       ),
+      handle: _hConn,
+      operationType: SQL_HANDLE_DBC,
       onException: ConnectionException(),
     );
     calloc
@@ -100,6 +111,7 @@ class DartOdbc {
     final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
+      handle: _hConn,
       onException: HandleException(),
     );
     final hStmt = pHStmt.value;
@@ -110,7 +122,7 @@ class DartOdbc {
     if (params != null) {
       tryOdbc(
         _sql.SQLPrepareW(hStmt, cQuery.cast(), cQuery.length),
-        statement: hStmt,
+        handle: hStmt,
         onException: QueryException(),
       );
 
@@ -132,7 +144,7 @@ class DartOdbc {
             cParam.length,
             nullptr,
           ),
-          statement: hStmt,
+          handle: hStmt,
         );
       }
 
@@ -151,7 +163,7 @@ class DartOdbc {
               cCol.length,
               code,
             ),
-            statement: hStmt,
+            handle: hStmt,
           );
 
           // free memory
@@ -163,10 +175,10 @@ class DartOdbc {
     if (params == null) {
       tryOdbc(
         _sql.SQLExecDirectW(hStmt, cQuery.cast(), query.length),
-        statement: hStmt,
+        handle: hStmt,
       );
     } else {
-      tryOdbc(_sql.SQLExecute(hStmt), statement: hStmt);
+      tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
     }
 
     final result = _getResultSetForUnsanitizedQuery(hStmt, cQuery.cast());
@@ -193,19 +205,24 @@ class DartOdbc {
   /// Function to handle ODBC errors
   /// The [status] parameter is the status code returned by the ODBC function.
   /// The [onException] parameter is the exception to throw if the status code
-  void tryOdbc(int status, {SQLHSTMT? statement, ODBCException? onException}) {
+  void tryOdbc(
+    int status, {
+    SQLHANDLE? handle,
+    int operationType = SQL_HANDLE_STMT,
+    ODBCException? onException,
+  }) {
     onException ??= ODBCException('EDBOC error');
     onException.code = status;
     if (status == SQL_ERROR) {
-      if (statement != null) {
+      if (handle != null) {
         final nativeErr = calloc.allocate<Int>(sizeOf<Int>())..value = status;
         final message = '1' * 10000;
         final msg = message.toNativeUtf16();
         final pStatus = calloc.allocate<UnsignedShort>(sizeOf<UnsignedShort>())
           ..value = status;
         _sql.SQLGetDiagRecW(
-          SQL_HANDLE_STMT,
-          statement,
+          operationType,
+          handle,
           1,
           pStatus,
           nativeErr,
@@ -222,6 +239,7 @@ class DartOdbc {
           ..free(msg)
           ..free(pStatus);
       }
+
       throw onException;
     }
   }
@@ -233,7 +251,7 @@ class DartOdbc {
     final columnCount = calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
     tryOdbc(
       _sql.SQLNumResultCols(hStmt, columnCount),
-      statement: hStmt,
+      handle: hStmt,
       onException: FetchException(),
     );
 
@@ -254,7 +272,7 @@ class DartOdbc {
           nullptr,
           nullptr,
         ),
-        statement: hStmt,
+        handle: hStmt,
         onException: FetchException(),
       );
       columnNames.add(
@@ -285,7 +303,7 @@ class DartOdbc {
             256,
             columnValueLength,
           ),
-          statement: hStmt,
+          handle: hStmt,
           onException: FetchException(),
         );
         if (columnValueLength.value == SQL_NULL_DATA) {

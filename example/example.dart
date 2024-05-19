@@ -13,5 +13,18 @@ void main(List<String> args) {
   if (env['DATABASE'] != null) {
     odbc.execute('USE ${env['DATABASE']}');
   }
-  print(odbc.execute(args.firstOrNull ?? "SELECT 10"));
+
+  bool hasParams = args.length > 1;
+  List<dynamic>? params;
+
+  List result;
+
+  if (hasParams) {
+    params = args.sublist(1);
+    result = odbc.execute(args.first, params: params);
+  } else {
+    result = odbc.execute(args.first);
+  }
+
+  print(result);
 }

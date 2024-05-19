@@ -10,9 +10,9 @@ class DartOdbc {
   /// DartOdbc constructor
   /// This constructor will initialize the ODBC environment and connection.
   /// The [pathToDriver] parameter is the path to the ODBC driver.
-  /// The [version] parameter is the Open Database Connectivity standard version
-  /// to be used. The default value is [SQL_OV_ODBC3_80] which is the latest
+  /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibODBC] class.
+  /// Please note that some drivers may not work with some drivers.
   DartOdbc(String pathToDriver, {int? version})
       : _sql = LibODBC(DynamicLibrary.open(pathToDriver)) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
@@ -103,10 +103,16 @@ class DartOdbc {
   /// in the result set. The keys in the map are the column names and the values
   /// are the column values.
   /// The [params] parameter is a list of parameters to bind to the query.
+  /// Example query:
+  /// ```dart
+  /// final List<Map<String, dynamic>> result = odbc.execute(
+  ///   'SELECT * FROM USERS WHERE UID = ?',
+  ///   params: [1],
+  /// );
+  /// ```
   List<Map<String, dynamic>> execute(
     String query, {
     List<dynamic>? params,
-    Map<String, Type>? cols,
   }) {
     final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
     tryOdbc(
@@ -147,29 +153,6 @@ class DartOdbc {
           handle: hStmt,
         );
       }
-
-      // binding cols
-      if (cols != null) {
-        for (var i = 0; i < cols.length; i++) {
-          final col = cols.keys.elementAt(i);
-          final cCol = col.toNativeUtf16();
-          final code = calloc.allocate<Long>(sizeOf<Long>());
-          tryOdbc(
-            _sql.SQLBindCol(
-              hStmt,
-              i + 1,
-              OdbcConversions.getCtypeFromType(cols[col]!),
-              cCol.cast(),
-              cCol.length,
-              code,
-            ),
-            handle: hStmt,
-          );
-
-          // free memory
-          calloc.free(cCol);
-        }
-      }
     }
 
     if (params == null) {
@@ -193,7 +176,7 @@ class DartOdbc {
   }
 
   /// Function to disconnect from the database
-  void diconnect() {
+  void disconnect() {
     _sql
       ..SQLDisconnect(_hConn)
       ..SQLFreeHandle(SQL_HANDLE_DBC, _hConn)
@@ -205,6 +188,12 @@ class DartOdbc {
   /// Function to handle ODBC errors
   /// The [status] parameter is the status code returned by the ODBC function.
   /// The [onException] parameter is the exception to throw if the status code
+  /// is an error.
+  /// The [handle] parameter is the handle to the ODBC object that caused the
+  /// error.
+  /// The [operationType] parameter is the type of operation that caused the
+  /// error.
+  /// If [handle] is not provided, the error message will not be descriptive.
   void tryOdbc(
     int status, {
     SQLHANDLE? handle,

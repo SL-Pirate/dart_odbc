@@ -35,14 +35,18 @@ void main(List<String> args) {
     odbc.execute('USE $db');
   }
 
-  List result = [];
-
-  result.add(
-    odbc.execute(
-      args[0],
-      params: args.sublist(1),
-    ),
+  List<Map<String, dynamic>> result = odbc.execute(
+    args[0], //  <-- SQL query
+    params: args.sublist(1), // <-- SQL query parameters
   );
 
   print(result);
+
+  result = odbc.execute(
+    'SELECT * FROM USERS WHERE UID = ?',
+    params: [1],
+  );
+
+  // finally disconnect from the db
+  odbc.disconnect();
 }

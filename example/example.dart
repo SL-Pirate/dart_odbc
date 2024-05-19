@@ -2,29 +2,47 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 
 void main(List<String> args) {
+  // loading variable from env
   final DotEnv env = DotEnv()..load(['.env']);
-  final odbc = DartOdbc(env['PATH_TO_DRIVER']!);
+
+  // username for the database
+  final username = env['USERNAME'];
+  // password for the database
+  final password = env['PASSWORD'];
+
+  // Path to the ODBC driver
+  // This can be found in the ODBC driver manager
+  // In windows this is a '.dll' file that is there in the installation folder of the ODBC driver
+  // in linux this has an extension of '.so' (shared library)
+  // In macos this should have an extension of '.dylib'
+  final pathToDriver = env['PATH_TO_DRIVER'];
+
+  // This is the name you gave when setting up the driver manager
+  // For more information, visit https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html
+  final dsn = env['DSN'];
+
+  // optionally to select database
+  final db = env['DATABASE'];
+
+  final odbc = DartOdbc(pathToDriver!);
   odbc.connect(
-    dsn: env['DSN']!,
-    username: env['USERNAME']!,
-    password: env['PASSWORD']!,
+    dsn: dsn!,
+    username: username!,
+    password: password!,
   );
 
-  if (env['DATABASE'] != null) {
-    odbc.execute('USE ${env['DATABASE']}');
+  if (db != null) {
+    odbc.execute('USE $db');
   }
 
-  bool hasParams = args.length > 1;
-  List<dynamic>? params;
+  List result = [];
 
-  List result;
-
-  if (hasParams) {
-    params = args.sublist(1);
-    result = odbc.execute(args.first, params: params);
-  } else {
-    result = odbc.execute(args.first);
-  }
+  result.add(
+    odbc.execute(
+      args[0],
+      params: args.sublist(1),
+    ),
+  );
 
   print(result);
 }

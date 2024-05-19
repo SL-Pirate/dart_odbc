@@ -10,8 +10,9 @@
       "type": "dart",
       "program": "example/example.dart",
       "args": [
-        "SELECT * FROM APPLICATION WHERE id=?",
-        "20240509-1241-8519-b480-ad2abf5384ad"
+        "SELECT id FROM TBL_APPLICATION WHERE id=?",
+        "test",
+        "2024-05-01"
       ]
     }
   ]

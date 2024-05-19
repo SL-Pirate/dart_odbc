@@ -3,8 +3,6 @@
 This is an api library for communicating with the odbc driver from dart
 This package is inspired by the original [odbc](https://pub.dev/packages/odbc) (obsolete).
 
-## This package is still in its early development stage and is not recommended for production
-
 [![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
 ## Usage
@@ -15,6 +13,13 @@ This package is inspired by the original [odbc](https://pub.dev/packages/odbc) (
   final odbc = DartOdbc('/path/to/the/odbc/driver');
 ```
 
+### Path to ODBC Driver
+
+Path to the ODBC driver can be found in the ODBC driver manager.
+In windows this is a `.dll` file that is there in the installation folder of the ODBC driver.
+In linux this has an extension of `.so`.
+In macos this should have an extension of `.dylib`.
+
 - Connect to the database by providing the DSN (Data Source Name) configured in the ODBC Driver Manager
 
 ```dart
@@ -24,6 +29,11 @@ This package is inspired by the original [odbc](https://pub.dev/packages/odbc) (
     password: 'db_password',
   );
 ```
+
+### DSN (Data Source Name)
+
+This is the name you gave when setting up the driver manager.
+For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html)
 
 - In case the path privided to the driver is invalid or there is any issue with setting up the environment/connecting to the database, an `Exception` will be thrown when intanciating the ODBC or connecting to the database.
 - Execute your queries directly as follows
@@ -42,4 +52,8 @@ This package is inspired by the original [odbc](https://pub.dev/packages/odbc) (
 
 TODO:
 
-- [ ] Implement query sanitization
+- [X] Implement query sanitization
+- [ ] Do more testing on different databases
+  - [X] MS SQL Server
+  - [ ] Oracle server
+- [ ] Improve documentation

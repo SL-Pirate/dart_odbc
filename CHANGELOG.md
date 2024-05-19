@@ -9,3 +9,7 @@
 ## 1.0.2+1
 
 - Renamed low level API class from api/sql to ffi/libodbc and renamed the class to LibODBC
+
+## 1.1.0+1
+
+- Implemented sanitization of sql queries using prepared statements

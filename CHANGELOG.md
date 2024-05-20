@@ -19,3 +19,7 @@
 - Improved exception handeling
 - Made setting up OSBC version optional.
 - Verified functionality with Oracle
+
+## 1.1.1+2
+
+- Updated documentation

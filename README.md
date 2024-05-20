@@ -28,7 +28,7 @@ In macos this should have an extension of `.dylib`.
 
 The ODBC version can be specified using the `version` parameter.
 Definitions for these values can be found in the `LibODBC` class.
-Please note that some drivers may not work properly with some drivers.
+Please note that some drivers may not work properly with manually setting version.
 
 - Connect to the database by providing the DSN (Data Source Name) configured in the ODBC Driver Manager
 
@@ -59,7 +59,7 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 
 ```dart
   final List<Map<String, dynamic>> result = odbc.execute(
-    'SELECT * FROM USERS WHERE UID = ?'
+    'SELECT * FROM USERS WHERE UID = ?',
     params: [1],
   );
 ```

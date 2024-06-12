@@ -66,7 +66,16 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 
 - Result will be a `List` of `Map` objects where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
 
-### Accessing ODBC diver directly
+### Unsupported whitespace unicode characters
+
+- On some platforms with some drivers sometimes unsupprted unicode characters can be included.
+- These characters can be pruned from the result set using the `removeWhitespaceUnicodes` method from the `DartOdbc` class.
+
+```dart
+  print(DartOdbc.removeWhitespaceUnicodes(result));
+```
+
+### Accessing ODBC diver bindings directly
 
 - Native `ODBC` methods can be executed by using the `LibODBC` import
 

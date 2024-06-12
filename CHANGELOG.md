@@ -23,3 +23,7 @@
 ## 1.1.1+2
 
 - Updated documentation
+
+## 1.2.0+1
+
+- Implemented `removeWhitespaceUnicodes` method to remove unicode whitespace characters on some platforms with some drivers (Thanks to Salah Sonbol)

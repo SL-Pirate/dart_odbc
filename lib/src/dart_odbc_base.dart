@@ -164,7 +164,7 @@ class DartOdbc {
       tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
     }
 
-    final result = _getResultSetForUnsanitizedQuery(hStmt, cQuery.cast());
+    final result = _getResult(hStmt, cQuery.cast());
 
     // free memory
     for (final ptr in pointers) {
@@ -233,7 +233,7 @@ class DartOdbc {
     }
   }
 
-  List<Map<String, dynamic>> _getResultSetForUnsanitizedQuery(
+  List<Map<String, dynamic>> _getResult(
     SQLHSTMT hStmt,
     Pointer<Uint16> cQuery,
   ) {
@@ -316,6 +316,37 @@ class DartOdbc {
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
     calloc.free(columnCount);
 
+    // return _removeEhitespaceUnicodes(rows);
     return rows;
+  }
+
+  static final _unicodeWhitespaceRegExp = RegExp(
+    r'[\u0000\u0020\u00A0\u180E\u200A\u200B\u202F\u205F\u3000\uFEFF\u2800\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u2400]',
+  );
+
+  static String _removeUnicodeWhitespaces(String input) {
+    return input.replaceAll(_unicodeWhitespaceRegExp, '');
+  }
+
+  /// On some platforms with some drivers, the ODBC driver may return
+  /// whitespace characters as unicode characters. This function will remove
+  /// these unicode whitespace characters from the result set.
+  static List<Map<String, dynamic>> removeWhitespaceUnicodes(
+    List<Map<String, dynamic>> result,
+  ) {
+    return result.map((record) {
+      final sanitizedDict = <String, String>{};
+      record.forEach((key, value) {
+        // Trim all whitespace from keys and values using a regular expression
+        final sanitizedKey = key.replaceAll(RegExp(r'\s+'), '');
+        final cleanedKey = _removeUnicodeWhitespaces(sanitizedKey);
+        final sanitizedValue =
+            value.toString().replaceAll(RegExp(r'[\s\u00A0]+'), '');
+        final cleanedValue = _removeUnicodeWhitespaces(sanitizedValue);
+
+        sanitizedDict[cleanedKey] = cleanedValue;
+      });
+      return sanitizedDict;
+    }).toList();
   }
 }

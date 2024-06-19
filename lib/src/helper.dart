@@ -48,20 +48,20 @@ class OdbcConversions {
   }
 
   /// Convert dart type to a pointer
-  static ToPointerDto<dynamic> toPointer(dynamic value) {
+  static OdbcPointer<dynamic> toPointer(dynamic value) {
     if (value is String) {
       final result = value.toNativeUtf16();
-      return ToPointerDto<Utf16>(result.cast(), result.length, value: value);
+      return OdbcPointer<Utf16>(result.cast(), result.length, value: value);
     } else if (value is int) {
       final result = calloc.allocate<Int>(sizeOf<Int>())..value = value;
-      return ToPointerDto<Int>(result.cast(), sizeOf<Int>(), value: value);
+      return OdbcPointer<Int>(result.cast(), sizeOf<Int>(), value: value);
     } else if (value is double) {
       final result = calloc.allocate<Float>(sizeOf<Float>())..value = value;
-      return ToPointerDto<Float>(result.cast(), sizeOf<Float>(), value: value);
+      return OdbcPointer<Float>(result.cast(), sizeOf<Float>(), value: value);
     } else if (value is bool) {
       // Allocate memory for a single byte (bool is typically 1 byte)
       final result = calloc.allocate<Uint8>(1)..value = value ? 1 : 0;
-      return ToPointerDto<Uint8>(result.cast(), 1, value: value);
+      return OdbcPointer<Uint8>(result.cast(), 1, value: value);
     } else {
       throw Exception('Unsupported data type: ${value.runtimeType}');
     }
@@ -69,9 +69,9 @@ class OdbcConversions {
 }
 
 /// A model that will be used to return the response of to pointer method
-class ToPointerDto<T> {
+class OdbcPointer<T> {
   /// constructor
-  ToPointerDto(this.ptr, this.length, {this.value});
+  OdbcPointer(this.ptr, this.length, {this.value});
 
   /// frees memory from the pointer
   void free() {
@@ -89,4 +89,30 @@ class ToPointerDto<T> {
 
   /// get the dart type of the pointer
   Type get type => T.runtimeType;
+}
+
+/// A model that will be used to configure the column type
+class ColumnType {
+  /// constructor
+  ColumnType({this.type, this.size});
+
+  /// SQL type
+  /// This can be any of the constants defined in the LibOdbc class
+  /// that start with SQL_C.
+  final int? type;
+
+  /// Size of the column
+  final int? size;
+}
+
+/// Extension class for dart [String]
+extension OdbcString on String {
+  static final _unicodeWhitespaceRegExp = RegExp(
+    r'[\u0000\u0020\u00A0\u180E\u200A\u200B\u202F\u205F\u3000\uFEFF\u2800\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u2400]',
+  );
+
+  /// Removes all unicode whitespaces from the string
+  String removeUnicodeWhitespaces() {
+    return replaceAll(_unicodeWhitespaceRegExp, '');
+  }
 }

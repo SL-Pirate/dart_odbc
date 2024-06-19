@@ -26,4 +26,8 @@
 
 ## 1.2.0+1
 
-- Implemented `removeWhitespaceUnicodes` method to remove unicode whitespace characters on some platforms with some drivers (Thanks to Salah Sonbol)
+- Implemented `removeWhitespaceUnicodes` method to remove unicode whitespace characters on some platforms with some drivers (Thanks to [Salah Sonbol](https://github.com/MrXen3))
+
+## 2.0.0+1
+
+- Exposed availability to configure data types and size for each column in the result set

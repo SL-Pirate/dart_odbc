@@ -64,20 +64,46 @@ For more information, visit this page from the [MySQL Documentation](https://dev
   );
 ```
 
-- Result will be a `List` of `Map` objects where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
+### Providing configuration for result set columns
 
-### Unsupported whitespace unicode characters
-
-- On some platforms with some drivers sometimes unsupprted unicode characters can be included.
-- These characters can be pruned from the result set using the `removeWhitespaceUnicodes` method from the `DartOdbc` class.
+- The abstraction layer of DartOdbc should be able to handle output for most queries
+- But output for columns with very long column size or uncommon data types could get corrupted due to issues in default memory allocation
+- Thes can be handled by providing the `ColumnType` in the `columnConfig` parameter of the `execute` method on `DartOdbc` class
+- Please refer the following example
 
 ```dart
-  print(DartOdbc.removeWhitespaceUnicodes(result));
+
+  // Assume a table like this
+  // +-----+-------+-------------+
+  // | UID | NAME  | DESCRIPTION |
+  // +-----+-------+-------------+
+  // | 1   | Alice |             |
+  // | 2   | Bob   |             |
+  // +-----+-------+-------------+
+  // The name is a column of size 150
+  // The description is a column of size 500
+
+  result = odbc.execute(
+    'SELECT * FROM USERS WHERE UID = ?',
+    params: [1],
+
+    /// The column config can be provided as this.
+    /// But for most cases this config is not necessary
+    /// This is only needed when the data fetching is not working as expected
+    /// Only the columns with issues need to be provided
+    columnConfig: {
+      'NAME': ColumnType(size: 150),
+      'DESCRIPTION': ColumnType(type: SQL_C_WCHAR, size: 500),
+    },
+  );
+
 ```
+
+- Result will be a `List` of `Map` objects where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
 
 ### Accessing ODBC diver bindings directly
 
-- Native `ODBC` methods can be executed by using the `LibODBC` import
+- Native `ODBC` methods can be executed by using the `LibOdbc` class
 
 - For more information on the `ODBC` api go to [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc?view=sql-server-ver16)
 

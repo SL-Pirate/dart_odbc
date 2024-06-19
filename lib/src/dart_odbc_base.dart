@@ -1,7 +1,7 @@
 import 'dart:ffi';
-import 'package:dart_odbc/src/conversions.dart';
 import 'package:dart_odbc/src/exceptions.dart';
-import 'package:dart_odbc/src/ffi_libodbc.dart';
+import 'package:dart_odbc/src/helper.dart';
+import 'package:dart_odbc/src/libodbc.dart';
 import 'package:ffi/ffi.dart';
 
 /// DartOdbc class
@@ -11,10 +11,10 @@ class DartOdbc {
   /// This constructor will initialize the ODBC environment and connection.
   /// The [pathToDriver] parameter is the path to the ODBC driver.
   /// Optionally the ODBC version can be specified using the [version] parameter
-  /// Definitions for these values can be found in the [LibODBC] class.
+  /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
   DartOdbc(String pathToDriver, {int? version})
-      : _sql = LibODBC(DynamicLibrary.open(pathToDriver)) {
+      : _sql = LibOdbc(DynamicLibrary.open(pathToDriver)) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version ?? 0;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
@@ -51,7 +51,7 @@ class DartOdbc {
       ..free(sqlNullHandle);
   }
 
-  final LibODBC _sql;
+  final LibOdbc _sql;
   SQLHANDLE _hEnv = nullptr;
   SQLHDBC _hConn = nullptr;
 
@@ -113,6 +113,7 @@ class DartOdbc {
   List<Map<String, dynamic>> execute(
     String query, {
     List<dynamic>? params,
+    Map<String, ColumnType> columnConfig = const {},
   }) {
     final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
     tryOdbc(
@@ -121,7 +122,7 @@ class DartOdbc {
       onException: HandleException(),
     );
     final hStmt = pHStmt.value;
-    final pointers = <ToPointerDto<dynamic>>[];
+    final pointers = <OdbcPointer<dynamic>>[];
     final cQuery = query.toNativeUtf16();
 
     // binding sanitized params
@@ -131,8 +132,6 @@ class DartOdbc {
         handle: hStmt,
         onException: QueryException(),
       );
-
-      /// These should be freed at the end of the query
 
       for (var i = 0; i < params.length; i++) {
         final param = params[i];
@@ -164,7 +163,13 @@ class DartOdbc {
       tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
     }
 
-    final result = _getResult(hStmt, cQuery.cast());
+    final result = _getResult(
+      hStmt,
+      cQuery.cast(),
+      columnConfig.map(
+        (key, value) => MapEntry(key.removeUnicodeWhitespaces(), value),
+      ),
+    );
 
     // free memory
     for (final ptr in pointers) {
@@ -236,6 +241,7 @@ class DartOdbc {
   List<Map<String, dynamic>> _getResult(
     SQLHSTMT hStmt,
     Pointer<Uint16> cQuery,
+    Map<String, ColumnType> columnConfig,
   ) {
     final columnCount = calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
     tryOdbc(
@@ -281,15 +287,19 @@ class DartOdbc {
     while (_sql.SQLFetch(hStmt) == SQL_SUCCESS) {
       final row = <String, dynamic>{};
       for (var i = 1; i <= columnCount.value; i++) {
+        final columnType =
+            columnConfig[columnNames[i - 1].removeUnicodeWhitespaces()];
         final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
-        final columnValue = calloc.allocate<Uint16>(sizeOf<Uint16>() * 256);
+        final columnValue = calloc.allocate<Uint16>(
+          sizeOf<Uint16>() * (columnType?.size ?? 256),
+        );
         tryOdbc(
           _sql.SQLGetData(
             hStmt,
             i,
-            SQL_C_WCHAR,
+            columnType?.type ?? SQL_WCHAR,
             columnValue.cast(),
-            256,
+            columnType?.size ?? 256,
             columnValueLength,
           ),
           handle: hStmt,
@@ -316,16 +326,7 @@ class DartOdbc {
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
     calloc.free(columnCount);
 
-    // return _removeEhitespaceUnicodes(rows);
     return rows;
-  }
-
-  static final _unicodeWhitespaceRegExp = RegExp(
-    r'[\u0000\u0020\u00A0\u180E\u200A\u200B\u202F\u205F\u3000\uFEFF\u2800\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u2400]',
-  );
-
-  static String _removeUnicodeWhitespaces(String input) {
-    return input.replaceAll(_unicodeWhitespaceRegExp, '');
   }
 
   /// On some platforms with some drivers, the ODBC driver may return
@@ -339,10 +340,10 @@ class DartOdbc {
       record.forEach((key, value) {
         // Trim all whitespace from keys and values using a regular expression
         final sanitizedKey = key.replaceAll(RegExp(r'\s+'), '');
-        final cleanedKey = _removeUnicodeWhitespaces(sanitizedKey);
+        final cleanedKey = sanitizedKey.removeUnicodeWhitespaces();
         final sanitizedValue =
             value.toString().replaceAll(RegExp(r'[\s\u00A0]+'), '');
-        final cleanedValue = _removeUnicodeWhitespaces(sanitizedValue);
+        final cleanedValue = sanitizedValue.removeUnicodeWhitespaces();
 
         sanitizedDict[cleanedKey] = cleanedValue;
       });

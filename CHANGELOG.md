@@ -35,3 +35,7 @@
 ## 2.1.0+1
 
 - Fixed bug where result set contains unicoded whitespace characters leading to problems with fetching values from result set using column  name and appearing weired symbols when showing values as text
+
+## 3.0.0+1
+
+- Implemented asynchronos support. No `connect`, `disconnect` and `execute` returns Futures!

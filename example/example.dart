@@ -2,6 +2,10 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 
 void main(List<String> args) {
+  run(args);
+}
+
+Future<void> run(List<String> args) async {
   // loading variable from env
   final DotEnv env = DotEnv()..load(['.env']);
 
@@ -25,17 +29,17 @@ void main(List<String> args) {
   final db = env['DATABASE'];
 
   final odbc = DartOdbc(pathToDriver!);
-  odbc.connect(
+  await odbc.connect(
     dsn: dsn!,
     username: username!,
     password: password!,
   );
 
   if (db != null) {
-    odbc.execute('USE $db');
+    await odbc.execute('USE $db');
   }
 
-  List<Map<String, dynamic>> result = odbc.execute(
+  List<Map<String, dynamic>> result = await odbc.execute(
     args[0], //  <-- SQL query
     params: args.sublist(1), // <-- SQL query parameters
     columnConfig: {
@@ -70,5 +74,5 @@ void main(List<String> args) {
   // );
 
   // finally disconnect from the db
-  odbc.disconnect();
+  await odbc.disconnect();
 }

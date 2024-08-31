@@ -60,11 +60,11 @@ class DartOdbc {
   /// This is the name you gave when setting up the ODBC manager.
   /// The [username] parameter is the username to connect to the database.
   /// The [password] parameter is the password to connect to the database.
-  void connect({
+  Future<void> connect({
     required String dsn,
     required String username,
     required String password,
-  }) {
+  }) async {
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
@@ -110,11 +110,11 @@ class DartOdbc {
   ///   params: [1],
   /// );
   /// ```
-  List<Map<String, dynamic>> execute(
+  Future<List<Map<String, dynamic>>> execute(
     String query, {
     List<dynamic>? params,
     Map<String, ColumnType> columnConfig = const {},
-  }) {
+  }) async {
     final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
@@ -175,7 +175,7 @@ class DartOdbc {
   }
 
   /// Function to disconnect from the database
-  void disconnect() {
+  Future<void> disconnect() async {
     _sql
       ..SQLDisconnect(_hConn)
       ..SQLFreeHandle(SQL_HANDLE_DBC, _hConn)

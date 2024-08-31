@@ -31,3 +31,7 @@
 ## 2.0.0+1
 
 - Exposed availability to configure data types and size for each column in the result set
+
+## 2.1.0+1
+
+- Fixed bug where result set contains unicoded whitespace characters leading to problems with fetching values from result set using column  name and appearing weired symbols when showing values as text

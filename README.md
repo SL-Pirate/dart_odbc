@@ -33,7 +33,7 @@ Please note that some drivers may not work properly with manually setting versio
 - Connect to the database by providing the DSN (Data Source Name) configured in the ODBC Driver Manager
 
 ```dart
-  odbc.connect(
+  await odbc.connect(
     dsn: '<your_dsn>',
     username: 'db_username',
     password: 'db_password',
@@ -49,7 +49,7 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 - Execute your queries directly as follows
 
 ```dart
-  final result = odbc.execute("SELECT 10");
+  final result = await odbc.execute("SELECT 10");
 ```
 
 ### Executing prepared statements
@@ -58,7 +58,7 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 - Example query
 
 ```dart
-  final List<Map<String, dynamic>> result = odbc.execute(
+  final List<Map<String, dynamic>> result = await odbc.execute(
     'SELECT * FROM USERS WHERE UID = ?',
     params: [1],
   );
@@ -83,7 +83,7 @@ For more information, visit this page from the [MySQL Documentation](https://dev
   // The name is a column of size 150
   // The description is a column of size 500
 
-  result = odbc.execute(
+  result = await odbc.execute(
     'SELECT * FROM USERS WHERE UID = ?',
     params: [1],
 
@@ -99,7 +99,15 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 
 ```
 
-- Result will be a `List` of `Map` objects where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
+- Result will be a `Future` of `List` of `Map` objects (`Future<List<Map<String, dynamic>>>`) where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
+
+### Disconnecting from the database
+
+- Finally, don't forget to `disconnect` from the database and free resources. 
+
+```dart
+  await odbc.disconnect();
+```
 
 ### Accessing ODBC diver bindings directly
 

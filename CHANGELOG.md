@@ -39,3 +39,7 @@
 ## 3.0.0+1
 
 - Implemented asynchronos support. No `connect`, `disconnect` and `execute` returns Futures!
+
+## 3.0.0+2
+
+- Updated documentation

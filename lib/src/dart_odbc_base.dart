@@ -163,13 +163,7 @@ class DartOdbc {
       tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
     }
 
-    final result = _getResult(
-      hStmt,
-      cQuery.cast(),
-      columnConfig.map(
-        (key, value) => MapEntry(key.removeUnicodeWhitespaces(), value),
-      ),
-    );
+    final result = _getResult(hStmt, cQuery.cast(), columnConfig);
 
     // free memory
     for (final ptr in pointers) {
@@ -270,10 +264,10 @@ class DartOdbc {
         handle: hStmt,
         onException: FetchException(),
       );
+      final charCodes = columnName.asTypedList(columnNameLength.value).toList()
+        ..removeWhere((e) => e == 0);
       columnNames.add(
-        String.fromCharCodes(
-          columnName.asTypedList(columnNameLength.value * 2),
-        ),
+        String.fromCharCodes(charCodes),
       );
 
       // free memory
@@ -287,8 +281,7 @@ class DartOdbc {
     while (_sql.SQLFetch(hStmt) == SQL_SUCCESS) {
       final row = <String, dynamic>{};
       for (var i = 1; i <= columnCount.value; i++) {
-        final columnType =
-            columnConfig[columnNames[i - 1].removeUnicodeWhitespaces()];
+        final columnType = columnConfig[columnNames[i - 1]];
         final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
         final columnValue = calloc.allocate<Uint16>(
           sizeOf<Uint16>() * (columnType?.size ?? 256),
@@ -309,9 +302,12 @@ class DartOdbc {
           row[columnNames[i - 1]] = null;
           continue;
         }
-        row[columnNames[i - 1]] = String.fromCharCodes(
-          columnValue.asTypedList(columnValueLength.value * 2),
-        );
+        // removing trailing zeros before converting to string
+        final charCodes = columnValue
+            .asTypedList(columnValueLength.value)
+            .toList()
+          ..removeWhere((e) => e == 0);
+        row[columnNames[i - 1]] = String.fromCharCodes(charCodes);
 
         // free memory
         calloc
@@ -332,6 +328,7 @@ class DartOdbc {
   /// On some platforms with some drivers, the ODBC driver may return
   /// whitespace characters as unicode characters. This function will remove
   /// these unicode whitespace characters from the result set.
+  @Deprecated('This method is no longer needed')
   static List<Map<String, dynamic>> removeWhitespaceUnicodes(
     List<Map<String, dynamic>> result,
   ) {

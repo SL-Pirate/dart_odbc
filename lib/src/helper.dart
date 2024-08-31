@@ -112,6 +112,7 @@ extension OdbcString on String {
   );
 
   /// Removes all unicode whitespaces from the string
+  @Deprecated('This method is no longer needed')
   String removeUnicodeWhitespaces() {
     return replaceAll(_unicodeWhitespaceRegExp, '');
   }

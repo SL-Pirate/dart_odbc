@@ -40,7 +40,7 @@ Please note that some drivers may not work properly with manually setting versio
   );
 ```
 
-- Connect to the database via connection string
+- Or connect to the database via connection string
 
 ```dart
   await odbc.connectWithConnectionString(
@@ -109,7 +109,7 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 
 - Result will be a `Future` of `List` of `Map` objects (`Future<List<Map<String, dynamic>>>`) where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
 
-### Get Tables (/Sheets for Excel)
+### Get Tables
 
 ```dart
 final List<Map<String, String>> tables = await odbc.getTables();

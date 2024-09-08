@@ -1,3 +1,5 @@
+// ignore_for_file: lines_longer_than_80_chars
+
 import 'dart:ffi';
 import 'package:dart_odbc/src/exceptions.dart';
 import 'package:dart_odbc/src/helper.dart';
@@ -154,7 +156,7 @@ class DartOdbc {
   /// catalog, schema, and type.
   ///
   /// Throws a [FetchException] if fetching tables fails.
-  Future<List<Map<String, String>>> getTables({
+  Future<List<Map<String, dynamic>>> getTables({
     String? tableName,
     String? catalog,
     String? schema,
@@ -191,30 +193,7 @@ class DartOdbc {
       onException: FetchException(),
     );
 
-    // Create a map of column names to table data
-    final result = <Map<String, String>>[];
-
-    // Fetch and store the result rows
-    final columnConfig = {
-      'TABLE_CAT': ColumnType(type: SQL_WCHAR, size: 256),
-      'TABLE_SCHEM': ColumnType(type: SQL_WCHAR, size: 256),
-      'TABLE_NAME': ColumnType(type: SQL_WCHAR, size: 256),
-      'TABLE_TYPE': ColumnType(type: SQL_WCHAR, size: 256),
-    };
-
-    while (_sql.SQLFetch(hStmt) == SQL_SUCCESS) {
-      final row = <String, String>{};
-
-      row['TABLE_CAT'] = _getColumnValue(hStmt, 1, columnConfig['TABLE_CAT']!);
-      row['TABLE_SCHEM'] =
-          _getColumnValue(hStmt, 2, columnConfig['TABLE_SCHEM']!);
-      row['TABLE_NAME'] =
-          _getColumnValue(hStmt, 3, columnConfig['TABLE_NAME']!);
-      row['TABLE_TYPE'] =
-          _getColumnValue(hStmt, 4, columnConfig['TABLE_TYPE']!);
-
-      result.add(row);
-    }
+    final result = _getResult(hStmt, {});
 
     // Clean up
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
@@ -224,40 +203,6 @@ class DartOdbc {
       ..free(cSchema)
       ..free(cTableName)
       ..free(cTableType);
-
-    return result;
-  }
-
-  /// Helper function to get a column value from the result set
-  String _getColumnValue(SQLHSTMT hStmt, int colIndex, ColumnType columnType) {
-    final valueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
-    final value = calloc.allocate<Uint16>(sizeOf<Uint16>() * columnType.size!);
-
-    tryOdbc(
-      _sql.SQLGetData(
-        hStmt,
-        colIndex,
-        columnType.type!,
-        value.cast(),
-        columnType.size!,
-        valueLength,
-      ),
-      handle: hStmt,
-    );
-
-    if (valueLength.value == SQL_NULL_DATA) {
-      return '';
-    }
-
-    // Convert the value to a Dart string, removing trailing zeros
-    final charCodes = value.asTypedList(valueLength.value).toList();
-    charCodes.removeWhere((e) => e == 0);
-
-    final result = String.fromCharCodes(charCodes);
-
-    calloc
-      ..free(value)
-      ..free(valueLength);
 
     return result;
   }
@@ -328,7 +273,7 @@ class DartOdbc {
       tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
     }
 
-    final result = _getResult(hStmt, cQuery.cast(), columnConfig);
+    final result = _getResult(hStmt, columnConfig);
 
     // free memory
     for (final ptr in pointers) {
@@ -399,7 +344,6 @@ class DartOdbc {
 
   List<Map<String, dynamic>> _getResult(
     SQLHSTMT hStmt,
-    Pointer<Uint16> cQuery,
     Map<String, ColumnType> columnConfig,
   ) {
     final columnCount = calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());

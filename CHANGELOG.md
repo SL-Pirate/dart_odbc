@@ -47,3 +47,7 @@
 ## 3.1.0+1
 
 - Implemented Implemented `connectWithConnectionString` and `getTables` methods (#6) (Thanks to [Paul-creator](https://github.com/Paul-creator))
+
+## 3.1.1+1
+
+- Added some missed commits

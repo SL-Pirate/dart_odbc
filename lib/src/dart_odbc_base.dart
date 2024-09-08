@@ -1,3 +1,5 @@
+// ignore_for_file: lines_longer_than_80_chars
+
 import 'dart:ffi';
 import 'package:dart_odbc/src/exceptions.dart';
 import 'package:dart_odbc/src/helper.dart';
@@ -97,6 +99,114 @@ class DartOdbc {
       ..free(cPassword);
   }
 
+  /// Connects to the database using a connection string instead of a DSN.
+  ///
+  /// [connectionString] is the full connection string that provides all necessary
+  /// connection details like driver, server, database, etc.
+  ///
+  /// This method is useful for connecting to data sources like Excel files or text files
+  /// without having to define a DSN.
+  ///
+  /// Throws a [ConnectionException] if the connection fails.
+  Future<void> connectWithConnectionString(String connectionString) async {
+    final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
+    tryOdbc(
+      _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
+      handle: _hEnv,
+      operationType: SQL_HANDLE_DBC,
+      onException: HandleException(),
+    );
+    _hConn = pHConn.value;
+
+    final cConnectionString =
+        connectionString.toNativeUtf16().cast<UnsignedShort>();
+
+    final outConnectionString =
+        calloc.allocate<UnsignedShort>(1024); // Adjust size as necessary
+    final outConnectionStringLen = calloc.allocate<Short>(sizeOf<Short>());
+
+    tryOdbc(
+      _sql.SQLDriverConnectW(
+        _hConn,
+        nullptr,
+        cConnectionString,
+        SQL_NTS,
+        outConnectionString,
+        1024,
+        outConnectionStringLen,
+        SQL_DRIVER_NOPROMPT,
+      ),
+      handle: _hConn,
+      operationType: SQL_HANDLE_DBC,
+      onException: ConnectionException(),
+    );
+    calloc
+      ..free(pHConn)
+      ..free(cConnectionString)
+      ..free(outConnectionString)
+      ..free(outConnectionStringLen);
+  }
+
+  /// Retrieves a list of tables from the connected database.
+  ///
+  /// Optionally, you can filter the results by specifying [tableName], [catalog],
+  /// [schema], or [tableType]. If these are omitted, all tables will be returned.
+  ///
+  /// Returns a list of maps, where each map represents a table with its name,
+  /// catalog, schema, and type.
+  ///
+  /// Throws a [FetchException] if fetching tables fails.
+  Future<List<Map<String, dynamic>>> getTables({
+    String? tableName,
+    String? catalog,
+    String? schema,
+    String? tableType,
+  }) async {
+    final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
+    tryOdbc(
+      _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
+      handle: _hConn,
+      onException: HandleException(),
+    );
+    final hStmt = pHStmt.value;
+
+    final cCatalog = catalog?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
+    final cSchema = schema?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
+    final cTableName =
+        tableName?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
+    final cTableType =
+        tableType?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
+
+    tryOdbc(
+      _sql.SQLTablesW(
+        hStmt,
+        cCatalog,
+        SQL_NTS,
+        cSchema,
+        SQL_NTS,
+        cTableName,
+        SQL_NTS,
+        cTableType,
+        SQL_NTS,
+      ),
+      handle: hStmt,
+      onException: FetchException(),
+    );
+
+    final result = _getResult(hStmt, {});
+
+    // Clean up
+    _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+    calloc
+      ..free(pHStmt)
+      ..free(cCatalog)
+      ..free(cSchema)
+      ..free(cTableName)
+      ..free(cTableType);
+
+    return result;
+  }
+
   /// Execute a query
   /// The [query] parameter is the SQL query to execute.
   /// This function will return a list of maps where each map represents a row
@@ -163,7 +273,7 @@ class DartOdbc {
       tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
     }
 
-    final result = _getResult(hStmt, cQuery.cast(), columnConfig);
+    final result = _getResult(hStmt, columnConfig);
 
     // free memory
     for (final ptr in pointers) {
@@ -234,7 +344,6 @@ class DartOdbc {
 
   List<Map<String, dynamic>> _getResult(
     SQLHSTMT hStmt,
-    Pointer<Uint16> cQuery,
     Map<String, ColumnType> columnConfig,
   ) {
     final columnCount = calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());

@@ -40,6 +40,14 @@ Please note that some drivers may not work properly with manually setting versio
   );
 ```
 
+- Or connect to the database via connection string
+
+```dart
+  await odbc.connectWithConnectionString(
+    "DRIVER={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)};DBQ=C:\Users\Computer\AppData\Local\Temp\test.xlsx;"
+  );
+```
+
 ### DSN (Data Source Name)
 
 This is the name you gave when setting up the driver manager.
@@ -101,9 +109,15 @@ For more information, visit this page from the [MySQL Documentation](https://dev
 
 - Result will be a `Future` of `List` of `Map` objects (`Future<List<Map<String, dynamic>>>`) where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
 
+### Get Tables
+
+```dart
+final List<Map<String, String>> tables = await odbc.getTables();
+```
+
 ### Disconnecting from the database
 
-- Finally, don't forget to `disconnect` from the database and free resources. 
+- Finally, don't forget to `disconnect` from the database and free resources.
 
 ```dart
   await odbc.disconnect();

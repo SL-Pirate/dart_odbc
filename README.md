@@ -146,3 +146,5 @@ This package has been tested to be working on the following Database Servers
 Hey everyone! 👋 I'm actively maintaining this project while juggling my studies and other responsibilities. If you find my work useful and would like to help me keep improving this project, consider supporting me! Your contributions will help me cover expenses, buy more coffee ☕, and dedicate more time to development. 🙌
 
 Every little bit helps, and I really appreciate your support. Thank you for helping me keep this project going! 💛
+
+- [buy me a coffee](https://buymeacoffee.com/slpirate)

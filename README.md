@@ -140,3 +140,9 @@ This package has been tested to be working on the following Database Servers
 
 - Although not tested, this plugin should work on any database that provides an `ODBC Driver`.
 - For a comprehensive list of supported database servers checkout `Drivers` section of the official [unixodbc](https://www.unixodbc.org/) site
+
+## 💖 Support the Project
+
+Hey everyone! 👋 I'm actively maintaining this project while juggling my studies and other responsibilities. If you find my work useful and would like to help me keep improving this project, consider supporting me! Your contributions will help me cover expenses, buy more coffee ☕, and dedicate more time to development. 🙌
+
+Every little bit helps, and I really appreciate your support. Thank you for helping me keep this project going! 💛

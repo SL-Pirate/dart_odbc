@@ -399,7 +399,7 @@ class DartOdbc {
           _sql.SQLGetData(
             hStmt,
             i,
-            columnType?.type ?? SQL_WCHAR,
+            /* columnType?.type ?? */ SQL_WCHAR,
             columnValue.cast(),
             columnType?.size ?? 256,
             columnValueLength,

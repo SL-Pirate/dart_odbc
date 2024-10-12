@@ -51,3 +51,7 @@
 ## 3.1.1+1
 
 - Added some missed commits
+
+## 3.1.2+1
+
+- Stopped using `columnConfig`'s `type` property as it is known to cause problems with how the data is transformed. Property is not removed for backwards compatibility but is not used anymore.

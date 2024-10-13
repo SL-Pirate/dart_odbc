@@ -1,0 +1,25 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "example",
+      "request": "launch",
+      "type": "dart",
+      "program": "example/example.dart",
+      "args": [
+        "SELECT * FROM TEST",
+        // "test",
+        // "2024-05-01"
+        // "INSERT INTO TEST (COL1, COL2) VALUES(?, ?)",
+        // "test",
+        // "101"
+      ],
+      "env": {
+        "LD_LIBRARY_PATH":"/home/slpirate/Downloads/instantclient-basic-linux.x64-23.4.0.24.05/instantclient_23_4/"
+      }
+    }
+  ]
+}

@@ -5,6 +5,10 @@ repository: https://github.com/SL-Pirate/dart_odbc
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
+  platforms:
+    - windows
+    - linux
+    - macos
 
 dependencies:
   ffi: ^2.1.2

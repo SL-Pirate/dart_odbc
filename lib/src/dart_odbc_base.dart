@@ -1,6 +1,7 @@
 // ignore_for_file: lines_longer_than_80_chars
 
 import 'dart:ffi';
+import 'dart:io';
 import 'package:dart_odbc/src/exceptions.dart';
 import 'package:dart_odbc/src/helper.dart';
 import 'package:dart_odbc/src/libodbc.dart';
@@ -11,12 +12,17 @@ import 'package:ffi/ffi.dart';
 class DartOdbc {
   /// DartOdbc constructor
   /// This constructor will initialize the ODBC environment and connection.
-  /// The [pathToDriver] parameter is the path to the ODBC driver.
+  /// The [pathToDriver] parameter is the path to the ODBC driver (optional).
+  /// if [pathToDriver] is not provided, the driver will be auto-detected from the ODBC.ini file.
+  /// The [dsn] parameter is the name of the DSN to connect to.
+  /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
   /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  DartOdbc(String pathToDriver, {int? version})
-      : _sql = LibOdbc(DynamicLibrary.open(pathToDriver)) {
+  DartOdbc({String? dsn, String? pathToDriver, int? version}) : _dsn = dsn {
+    if (pathToDriver != null) {
+      __sql = LibOdbc(DynamicLibrary.open(pathToDriver));
+    }
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version ?? 0;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
@@ -53,20 +59,70 @@ class DartOdbc {
       ..free(sqlNullHandle);
   }
 
-  final LibOdbc _sql;
+  LibOdbc get _sql {
+    if (__sql != null) {
+      return __sql!;
+    }
+
+    // auto detecting odbc driver from odbc.ini
+    if (Platform.isLinux || Platform.isMacOS) {
+      // final systemFile = File('/etc/odbc.ini');
+      // final userFile = File('~/.odbc.ini');
+      _getOdbcDriverFromOdbcIniUnix(File('/etc/odbcinst.ini'));
+    }
+
+    if (__sql == null) {
+      throw ODBCException('ODBC driver not found');
+    }
+
+    return __sql!;
+  }
+
+  bool _getOdbcDriverFromOdbcIniUnix(File file) {
+    if (!file.existsSync()) {
+      return false;
+    }
+
+    final lines = file.readAsLinesSync();
+    for (final line in lines) {
+      final proecss = Process.runSync('odbcinst', ['-q', '-d', _dsn!]);
+      if (proecss.stderr.toString().isNotEmpty) {
+        throw ODBCException(proecss.stderr.toString());
+      }
+      final entry = proecss.stdout.toString();
+      if (line.contains(entry)) {}
+      final index = lines.indexOf(line);
+      for (var i = index + 1; i < lines.length; i++) {
+        final nextLine = lines[i];
+        if (nextLine.contains('Driver=')) {
+          if (nextLine.isEmpty || nextLine.startsWith('[')) {
+            break;
+          }
+          __sql = LibOdbc(DynamicLibrary.open(nextLine.split('=')[1]));
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  LibOdbc? __sql;
+  final String? _dsn;
   SQLHANDLE _hEnv = nullptr;
   SQLHDBC _hConn = nullptr;
 
   /// Connect to a database
-  /// The [dsn] parameter is the Data Source Name.
   /// This is the name you gave when setting up the ODBC manager.
   /// The [username] parameter is the username to connect to the database.
   /// The [password] parameter is the password to connect to the database.
   Future<void> connect({
-    required String dsn,
     required String username,
     required String password,
   }) async {
+    if (_dsn == null) {
+      throw ODBCException('DSN not provided');
+    }
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
@@ -75,14 +131,14 @@ class DartOdbc {
       onException: HandleException(),
     );
     _hConn = pHConn.value;
-    final cDsn = dsn.toNativeUtf16().cast<UnsignedShort>();
+    final cDsn = _dsn!.toNativeUtf16().cast<UnsignedShort>();
     final cUsername = username.toNativeUtf16().cast<UnsignedShort>();
     final cPassword = password.toNativeUtf16().cast<UnsignedShort>();
     tryOdbc(
       _sql.SQLConnectW(
         _hConn,
         cDsn,
-        dsn.length,
+        _dsn!.length,
         cUsername,
         username.length,
         cPassword,

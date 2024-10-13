@@ -22,7 +22,7 @@ Future<void> run(List<String> args) async {
   // In windows this is a '.dll' file that is there in the installation folder of the ODBC driver
   // in linux this has an extension of '.so' (shared library)
   // In macos this should have an extension of '.dylib'
-  final pathToDriver = env['PATH_TO_DRIVER']!;
+  // final pathToDriver = env['PATH_TO_DRIVER']!;
   final driverName = env['DRIVER_NAME']!;
   final pathToFile = env['PATH_TO_FILE']!;
 
@@ -32,7 +32,7 @@ Future<void> run(List<String> args) async {
       : pathToFile;
 
   final connStr = "DRIVER={$driverName};DBQ=$pathOfLoadedFile;";
-  final odbc = DartOdbc(pathToDriver);
+  final odbc = DartOdbc();
 
   try {
     await odbc.connectWithConnectionString(connStr);

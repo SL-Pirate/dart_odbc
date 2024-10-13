@@ -12,19 +12,26 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
 
 ```dart
   final odbc = DartOdbc(
-    '/path/to/the/odbc/driver',
-    version=SQL_OV_ODBC3_80 // optional
+    dsn: '<your_dsn>',
+    pathToDriver: '<path_to_odbc_driver>',  // optional as this will be automatically detected
+    version=SQL_OV_ODBC3_80 // optional and should be set at your own risk
   );
 ```
 
-### Path to ODBC Driver
+### DSN (optional)
+
+The DSN (Data Source Name) is the name you gave when setting up the driver manager.
+For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html)
+If not provided, the `pathToDriver` parameter should be provided, and the connection can only be made via connection string.
+
+### Path to ODBC Driver (optional)
 
 Path to the ODBC driver can be found in the ODBC driver manager.
 In windows this is a `.dll` file that is there in the installation folder of the ODBC driver.
 In linux this has an extension of `.so`.
 In macos this should have an extension of `.dylib`.
 
-### version
+### version (optional)
 
 The ODBC version can be specified using the `version` parameter.
 Definitions for these values can be found in the `LibODBC` class.
@@ -34,7 +41,6 @@ Please note that some drivers may not work properly with manually setting versio
 
 ```dart
   await odbc.connect(
-    dsn: '<your_dsn>',
     username: 'db_username',
     password: 'db_password',
   );
@@ -48,13 +54,7 @@ Please note that some drivers may not work properly with manually setting versio
   );
 ```
 
-### DSN (Data Source Name)
-
-This is the name you gave when setting up the driver manager.
-For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html)
-
-- In case the path privided to the driver is invalid or there is any issue with setting up the environment/connecting to the database, an `Exception` will be thrown when intanciating the ODBC or connecting to the database.
-- Execute your queries directly as follows
+### Executing SQL queries
 
 ```dart
   final result = await odbc.execute("SELECT 10");

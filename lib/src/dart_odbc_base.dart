@@ -22,7 +22,38 @@ class DartOdbc {
   DartOdbc({String? dsn, String? pathToDriver, int? version}) : _dsn = dsn {
     if (pathToDriver != null) {
       __sql = LibOdbc(DynamicLibrary.open(pathToDriver));
+    } else {
+      // auto detecting odbc driver from odbc.ini
+      if (Platform.isLinux || Platform.isMacOS) {
+        _getOdbcDriverFromOdbcIniUnix();
+      } else if (Platform.isWindows) {
+        final regKeys = [
+          r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ODBC\ODBC.INI',
+          r'HKEY_LOCAL_MACHINE\SOFTWARE\ODBC\ODBC.INI',
+          r'HKEY_CURRENT_USER\SOFTWARE\ODBC\ODBC.INI',
+        ];
+        var result = false;
+        var i = 0;
+        do {
+          result = _getOdbcDriverWindows(regKeys[i]);
+          i++;
+        } while (!result && i < regKeys.length);
+      }
+
+      if (__sql == null) {
+        throw ODBCException('ODBC driver not found');
+      }
     }
+
+    _initialize(version: version);
+  }
+
+  LibOdbc? __sql;
+  final String? _dsn;
+  SQLHANDLE _hEnv = nullptr;
+  SQLHDBC _hConn = nullptr;
+
+  void _initialize({int? version}) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version ?? 0;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
@@ -64,33 +95,11 @@ class DartOdbc {
       return __sql!;
     }
 
-    // auto detecting odbc driver from odbc.ini
-    if (Platform.isLinux || Platform.isMacOS) {
-      // final systemFile = File('/etc/odbc.ini');
-      // final userFile = File('~/.odbc.ini');
-      _getOdbcDriverFromOdbcIniUnix(File('/etc/odbcinst.ini'));
-    } else if (Platform.isWindows) {
-      final regKeys = [
-        r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\',
-        r'HKEY_LOCAL_MACHINE\SOFTWARE\ODBC\ODBC.INI',
-        r'HKEY_CURRENT_USER\SOFTWARE\ODBC\ODBC.INI',
-      ];
-      var result = false;
-      var i = 0;
-      do {
-        result = _getOdbcDriverWindows(regKeys[i]);
-        i++;
-      } while (!result && i < regKeys.length);
-    }
-
-    if (__sql == null) {
-      throw ODBCException('ODBC driver not found');
-    }
-
-    return __sql!;
+    throw ODBCException('ODBC driver not found');
   }
 
-  bool _getOdbcDriverFromOdbcIniUnix(File file) {
+  bool _getOdbcDriverFromOdbcIniUnix() {
+    final file = File('/etc/odbcinst.ini');
     if (!file.existsSync()) {
       return false;
     }
@@ -141,11 +150,6 @@ class DartOdbc {
       }
     }
   }
-
-  LibOdbc? __sql;
-  final String? _dsn;
-  SQLHANDLE _hEnv = nullptr;
-  SQLHDBC _hConn = nullptr;
 
   /// Connect to a database
   /// This is the name you gave when setting up the ODBC manager.

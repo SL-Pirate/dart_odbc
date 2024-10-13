@@ -14,25 +14,13 @@ Future<void> run(List<String> args) async {
   // password for the database
   final password = env['PASSWORD'];
 
-  // Path to the ODBC driver
-  // This can be found in the ODBC driver manager
-  // In windows this is a '.dll' file that is there in the installation folder of the ODBC driver
-  // in linux this has an extension of '.so' (shared library)
-  // In macos this should have an extension of '.dylib'
-  // final pathToDriver = env['PATH_TO_DRIVER'];
-
-  // This is the name you gave when setting up the driver manager
-  // For more information, visit https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html
   final dsn = env['DSN'];
 
   // optionally to select database
   final db = env['DATABASE'];
 
   final odbc = DartOdbc(dsn: dsn);
-  await odbc.connect(
-    username: username!,
-    password: password!,
-  );
+  await odbc.connect(username: username!, password: password!);
 
   if (db != null) {
     await odbc.execute('USE $db');

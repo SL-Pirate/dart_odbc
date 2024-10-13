@@ -59,3 +59,7 @@
 ## 3.1.2+2
 
 - Updated readme
+
+## 4.0.0+1
+
+- Implemented auto detecting odbc driver from driver manager

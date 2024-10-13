@@ -1,14 +1,15 @@
 name: dart_odbc
 description: A Dart package for interacting with ODBC databases. It allows you to connect to ODBC data sources and execute SQL queries directly from your Dart applications.
-version: 3.1.2+2
+version: 4.0.0+1
 repository: https://github.com/SL-Pirate/dart_odbc
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
-  platforms:
-    - windows
-    - linux
-    - macos
+
+platforms:
+  windows:
+  linux:
+  macos:
 
 dependencies:
   ffi: ^2.1.2

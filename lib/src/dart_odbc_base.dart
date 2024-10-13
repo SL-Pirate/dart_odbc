@@ -69,6 +69,18 @@ class DartOdbc {
       // final systemFile = File('/etc/odbc.ini');
       // final userFile = File('~/.odbc.ini');
       _getOdbcDriverFromOdbcIniUnix(File('/etc/odbcinst.ini'));
+    } else if (Platform.isWindows) {
+      final regKeys = [
+        r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\',
+        r'HKEY_LOCAL_MACHINE\SOFTWARE\ODBC\ODBC.INI',
+        r'HKEY_CURRENT_USER\SOFTWARE\ODBC\ODBC.INI',
+      ];
+      var result = false;
+      var i = 0;
+      do {
+        result = _getOdbcDriverWindows(regKeys[i]);
+        i++;
+      } while (!result && i < regKeys.length);
     }
 
     if (__sql == null) {
@@ -86,7 +98,7 @@ class DartOdbc {
     final lines = file.readAsLinesSync();
     for (final line in lines) {
       final proecss = Process.runSync('odbcinst', ['-q', '-d', _dsn!]);
-      if (proecss.stderr.toString().isNotEmpty) {
+      if (proecss.exitCode != 0) {
         throw ODBCException(proecss.stderr.toString());
       }
       final entry = proecss.stdout.toString();
@@ -105,6 +117,29 @@ class DartOdbc {
     }
 
     return false;
+  }
+
+  bool _getOdbcDriverWindows(String registryKey) {
+    final process = Process.runSync('reg', [
+      'query',
+      '$registryKey\\$_dsn',
+      '/v',
+      'Driver',
+    ]);
+    if (process.exitCode != 0) {
+      return false;
+    } else {
+      try {
+        __sql = LibOdbc(
+          DynamicLibrary.open(
+            process.stdout.toString().split('   ').last.trim(),
+          ),
+        );
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
   }
 
   LibOdbc? __sql;

@@ -63,3 +63,7 @@
 ## 4.0.0+1
 
 - Implemented auto detecting odbc driver from driver manager
+
+## 4.1.0+1
+
+- Implemented `DartOdbcUtf8` class for handling utf8

@@ -1,16 +1,10 @@
 // ignore_for_file: lines_longer_than_80_chars
 
-import 'dart:ffi';
-import 'dart:io';
-import 'package:dart_odbc/src/exceptions.dart';
-import 'package:dart_odbc/src/helper.dart';
-import 'package:dart_odbc/src/libodbc.dart';
-import 'package:dart_odbc/src/libodbcext.dart';
-import 'package:ffi/ffi.dart';
+part of './dart_odbc_base.dart';
 
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
-class DartOdbc2 {
+class DartOdbcUtf8 extends DartOdbc {
   /// DartOdbc constructor
   /// This constructor will initialize the ODBC environment and connection.
   /// The [pathToDriver] parameter is the path to the ODBC driver (optional).
@@ -20,41 +14,10 @@ class DartOdbc2 {
   /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  DartOdbc2({String? dsn, String? pathToDriver, int? version}) : _dsn = dsn {
-    if (pathToDriver != null) {
-      __sql = LibOdbcExt(DynamicLibrary.open(pathToDriver));
-    } else {
-      // auto detecting odbc driver from odbc.ini
-      if (Platform.isLinux || Platform.isMacOS) {
-        _getOdbcDriverFromOdbcIniUnix();
-      } else if (Platform.isWindows) {
-        final regKeys = [
-          r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ODBC\ODBC.INI',
-          r'HKEY_LOCAL_MACHINE\SOFTWARE\ODBC\ODBC.INI',
-          r'HKEY_CURRENT_USER\SOFTWARE\ODBC\ODBC.INI',
-          r'HKEY_CURRENT_USER\Software\Wow6432Node\ODBC\ODBC.INI',
-        ];
-        var result = false;
-        var i = 0;
-        do {
-          result = _getOdbcDriverWindows(regKeys[i]);
-          i++;
-        } while (!result && i < regKeys.length);
-      }
+  DartOdbcUtf8({super.dsn, super.pathToDriver, super.version})
+      : super._internal();
 
-      if (__sql == null) {
-        throw ODBCException('ODBC driver not found');
-      }
-    }
-
-    _initialize(version: version);
-  }
-
-  LibOdbc? __sql;
-  final String? _dsn;
-  SQLHANDLE _hEnv = nullptr;
-  SQLHDBC _hConn = nullptr;
-
+  @override
   void _initialize({int? version}) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
       ..value = version ?? 0;
@@ -92,71 +55,11 @@ class DartOdbc2 {
       ..free(sqlNullHandle);
   }
 
-  LibOdbc get _sql {
-    if (__sql != null) {
-      return __sql!;
-    }
-
-    throw ODBCException('ODBC driver not found');
-  }
-
-  bool _getOdbcDriverFromOdbcIniUnix() {
-    final file = File('/etc/odbcinst.ini');
-    if (!file.existsSync()) {
-      return false;
-    }
-
-    final lines = file.readAsLinesSync();
-    for (final line in lines) {
-      final proecss = Process.runSync('odbcinst', ['-q', '-d', _dsn!]);
-      if (proecss.exitCode != 0) {
-        throw ODBCException(proecss.stderr.toString());
-      }
-      final entry = proecss.stdout.toString();
-      if (line.contains(entry)) {}
-      final index = lines.indexOf(line);
-      for (var i = index + 1; i < lines.length; i++) {
-        final nextLine = lines[i];
-        if (nextLine.contains('Driver=')) {
-          if (nextLine.isEmpty || nextLine.startsWith('[')) {
-            break;
-          }
-          __sql = LibOdbcExt(DynamicLibrary.open(nextLine.split('=')[1]));
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  bool _getOdbcDriverWindows(String registryKey) {
-    final process = Process.runSync('reg', [
-      'query',
-      '$registryKey\\$_dsn',
-      '/v',
-      'Driver',
-    ]);
-    if (process.exitCode != 0) {
-      return false;
-    } else {
-      try {
-        __sql = LibOdbcExt(
-          DynamicLibrary.open(
-            process.stdout.toString().split('   ').last.trim(),
-          ),
-        );
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-  }
-
   /// Connect to a database
   /// This is the name you gave when setting up the ODBC manager.
   /// The [username] parameter is the username to connect to the database.
   /// The [password] parameter is the password to connect to the database.
+  @override
   Future<void> connect({
     required String username,
     required String password,
@@ -205,6 +108,7 @@ class DartOdbc2 {
   /// without having to define a DSN.
   ///
   /// Throws a [ConnectionException] if the connection fails.
+  @override
   Future<void> connectWithConnectionString(String connectionString) async {
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
     tryOdbc(
@@ -252,6 +156,7 @@ class DartOdbc2 {
   /// catalog, schema, and type.
   ///
   /// Throws a [FetchException] if fetching tables fails.
+  @override
   Future<List<Map<String, dynamic>>> getTables({
     String? tableName,
     String? catalog,
@@ -314,6 +219,7 @@ class DartOdbc2 {
   ///   params: [1],
   /// );
   /// ```
+  @override
   Future<List<Map<String, dynamic>>> execute(
     String query, {
     List<dynamic>? params,
@@ -379,6 +285,7 @@ class DartOdbc2 {
   }
 
   /// Function to disconnect from the database
+  @override
   Future<void> disconnect() async {
     _sql
       ..SQLDisconnect(_hConn)
@@ -397,13 +304,14 @@ class DartOdbc2 {
   /// The [operationType] parameter is the type of operation that caused the
   /// error.
   /// If [handle] is not provided, the error message will not be descriptive.
+  @override
   void tryOdbc(
     int status, {
     SQLHANDLE? handle,
     int operationType = SQL_HANDLE_STMT,
     ODBCException? onException,
   }) {
-    onException ??= ODBCException('EDBOC error');
+    onException ??= ODBCException('ODBC error');
     onException.code = status;
     if (status == SQL_ERROR) {
       if (handle != null) {
@@ -412,16 +320,20 @@ class DartOdbc2 {
         final msg = message.toNativeUtf8();
         final pStatus = calloc.allocate<SQLCHAR>(sizeOf<SQLCHAR>())
           ..value = status;
-        _sql.SQLGetDiagRec(
-          operationType,
-          handle,
-          1,
-          pStatus,
-          nativeErr,
-          msg.cast(),
-          message.length,
-          nullptr,
-        );
+        try {
+          _sql.SQLGetDiagRec(
+            operationType,
+            handle,
+            1,
+            pStatus,
+            nativeErr,
+            msg.cast(),
+            message.length,
+            nullptr,
+          );
+        } catch (e) {
+          // ignore
+        }
 
         onException.message = msg.toDartString();
 
@@ -436,6 +348,7 @@ class DartOdbc2 {
     }
   }
 
+  @override
   List<Map<String, dynamic>> _getResult(
     SQLHSTMT hStmt,
     Map<String, ColumnType> columnConfig,

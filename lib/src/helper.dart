@@ -117,3 +117,12 @@ extension OdbcString on String {
     return replaceAll(_unicodeWhitespaceRegExp, '');
   }
 }
+
+///
+enum UtfType {
+  ///
+  utf8,
+
+  ///
+  utf16,
+}

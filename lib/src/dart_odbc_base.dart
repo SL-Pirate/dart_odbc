@@ -2,11 +2,11 @@
 
 import 'dart:ffi';
 import 'dart:io';
-import 'package:dart_odbc/src/exceptions.dart';
-import 'package:dart_odbc/src/helper.dart';
-import 'package:dart_odbc/src/libodbc.dart';
+import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
+
+part './dart_odbc_base_utf8.dart';
 
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
@@ -20,7 +20,29 @@ class DartOdbc {
   /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  DartOdbc({String? dsn, String? pathToDriver, int? version}) : _dsn = dsn {
+  factory DartOdbc({
+    String? dsn,
+    String? pathToDriver,
+    int? version,
+    UtfType utfType = UtfType.utf16,
+  }) {
+    if (utfType == UtfType.utf8) {
+      return DartOdbcUtf8(
+        dsn: dsn,
+        pathToDriver: pathToDriver,
+        version: version,
+      );
+    }
+
+    return DartOdbc._internal(
+      dsn: dsn,
+      pathToDriver: pathToDriver,
+      version: version,
+    );
+  }
+
+  DartOdbc._internal({String? dsn, String? pathToDriver, int? version})
+      : _dsn = dsn {
     if (pathToDriver != null) {
       __sql = LibOdbcExt(DynamicLibrary.open(pathToDriver));
     } else {
@@ -406,7 +428,7 @@ class DartOdbc {
     int operationType = SQL_HANDLE_STMT,
     ODBCException? onException,
   }) {
-    onException ??= ODBCException('EDBOC error');
+    onException ??= ODBCException('ODBC error');
     onException.code = status;
     if (status == SQL_ERROR) {
       if (handle != null) {
@@ -415,16 +437,20 @@ class DartOdbc {
         final msg = message.toNativeUtf16();
         final pStatus = calloc.allocate<UnsignedShort>(sizeOf<UnsignedShort>())
           ..value = status;
-        _sql.SQLGetDiagRecW(
-          operationType,
-          handle,
-          1,
-          pStatus,
-          nativeErr,
-          msg.cast(),
-          message.length,
-          nullptr,
-        );
+        try {
+          _sql.SQLGetDiagRecW(
+            operationType,
+            handle,
+            1,
+            pStatus,
+            nativeErr,
+            msg.cast(),
+            message.length,
+            nullptr,
+          );
+        } catch (e) {
+          // ignore
+        }
 
         onException.message = msg.toDartString();
 

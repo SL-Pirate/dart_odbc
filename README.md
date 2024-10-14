@@ -123,6 +123,13 @@ final List<Map<String, String>> tables = await odbc.getTables();
   await odbc.disconnect();
 ```
 
+### Troubleshooting
+
+#### ArgumentError (Invalid argument(s): Failed to lookup symbol '{Symbol}' in ...)
+
+- This error is thrown when the ODBC driver is not fully compatible with the version of the ODBC API being used
+- As a workaround, use `DartOdbcUtf8` class which usually has fixes for this issue. If the issue persists, please open an issue on the repository
+
 ### Accessing ODBC diver bindings directly
 
 - Native `ODBC` methods can be executed by using the `LibOdbc` class

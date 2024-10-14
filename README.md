@@ -15,6 +15,7 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
     dsn: '<your_dsn>',
     pathToDriver: '<path_to_odbc_driver>',  // optional as this will be automatically detected
     version=SQL_OV_ODBC3_80 // optional and should be set at your own risk
+    utfType: UtfType.utf16, // optional
   );
 ```
 
@@ -128,7 +129,14 @@ final List<Map<String, String>> tables = await odbc.getTables();
 #### ArgumentError (Invalid argument(s): Failed to lookup symbol '{Symbol}' in ...)
 
 - This error is thrown when the ODBC driver is not fully compatible with the version of the ODBC API being used
-- As a workaround, use `DartOdbcUtf8` class which usually has fixes for this issue. If the issue persists, please open an issue on the repository
+- As a workaround, set the utfType to utf8 in `DartOdbc` constructor
+
+```dart
+  final odbc = DartOdbc(
+    dsn: '<your_dsn>',
+    utfType: UtfType.utf8,
+  );
+```
 
 ### Accessing ODBC diver bindings directly
 

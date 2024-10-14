@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dart_odbc/src/exceptions.dart';
 import 'package:dart_odbc/src/helper.dart';
 import 'package:dart_odbc/src/libodbc.dart';
+import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
 
 /// DartOdbc class
@@ -21,7 +22,7 @@ class DartOdbc {
   /// Please note that some drivers may not work with some drivers.
   DartOdbc({String? dsn, String? pathToDriver, int? version}) : _dsn = dsn {
     if (pathToDriver != null) {
-      __sql = LibOdbc(DynamicLibrary.open(pathToDriver));
+      __sql = LibOdbcExt(DynamicLibrary.open(pathToDriver));
     } else {
       // auto detecting odbc driver from odbc.ini
       if (Platform.isLinux || Platform.isMacOS) {
@@ -31,6 +32,7 @@ class DartOdbc {
           r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ODBC\ODBC.INI',
           r'HKEY_LOCAL_MACHINE\SOFTWARE\ODBC\ODBC.INI',
           r'HKEY_CURRENT_USER\SOFTWARE\ODBC\ODBC.INI',
+          r'HKEY_CURRENT_USER\Software\Wow6432Node\ODBC\ODBC.INI',
         ];
         var result = false;
         var i = 0;
@@ -119,7 +121,7 @@ class DartOdbc {
           if (nextLine.isEmpty || nextLine.startsWith('[')) {
             break;
           }
-          __sql = LibOdbc(DynamicLibrary.open(nextLine.split('=')[1]));
+          __sql = LibOdbcExt(DynamicLibrary.open(nextLine.split('=')[1]));
           return true;
         }
       }
@@ -139,7 +141,7 @@ class DartOdbc {
       return false;
     } else {
       try {
-        __sql = LibOdbc(
+        __sql = LibOdbcExt(
           DynamicLibrary.open(
             process.stdout.toString().split('   ').last.trim(),
           ),

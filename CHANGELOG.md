@@ -67,3 +67,7 @@
 ## 4.1.0+1
 
 - Implemented `DartOdbcUtf8` class for handling utf8
+
+## 4.1.1+1
+
+- Improved auto-detecting drivers on windows

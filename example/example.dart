@@ -19,11 +19,7 @@ Future<void> run(List<String> args) async {
   // optionally to select database
   final db = env['DATABASE'];
 
-  final odbc = DartOdbc(
-    dsn: dsn,
-    version: SQL_OV_ODBC2,
-    utfType: UtfType.utf16,
-  );
+  final odbc = DartOdbc(dsn: dsn);
   await odbc.connect(username: username!, password: password!);
 
   if (db != null) {

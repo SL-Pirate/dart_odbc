@@ -6,8 +6,6 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
 
-part './dart_odbc_base_utf8.dart';
-
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
 class DartOdbc {
@@ -23,20 +21,12 @@ class DartOdbc {
   factory DartOdbc({
     String? dsn,
     String? pathToDriver,
-    int? version,
+    @Deprecated('Is not used anymore') int? version,
     @Deprecated(
       'It is not required to use this anymore as the issue has been fixed',
     )
     UtfType utfType = UtfType.utf16,
   }) {
-    // if (utfType == UtfType.utf8) {
-    //   return DartOdbcUtf8(
-    //     dsn: dsn,
-    //     pathToDriver: pathToDriver,
-    //     version: version,
-    //   );
-    // }
-
     return DartOdbc._internal(
       dsn: dsn,
       pathToDriver: pathToDriver,
@@ -71,35 +61,17 @@ class DartOdbc {
   SQLHDBC _hConn = nullptr;
 
   void _initialize({int? version}) {
-    final sqlOvOdbc = calloc.allocate<Int>(sizeOf<Int>())
-      ..value = version ?? SQL_OV_ODBC3_80;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>());
     final pHEnv = calloc.allocate<SQLHANDLE>(sizeOf<SQLHANDLE>());
     tryOdbc(
-      _sql.SQLAllocEnv(
-        // SQL_HANDLE_ENV,
-        // sqlNullHandle.cast(),
-        pHEnv,
-      ),
+      _sql.SQLAllocEnv(pHEnv),
       operationType: SQL_HANDLE_ENV,
       handle: pHEnv.value,
       onException: HandleException(),
     );
     _hEnv = pHEnv.value;
 
-    // tryOdbc(
-    //   _sql.SQLAllocEnv(
-    //     // _hEnv,
-    //     // SQL_ATTR_ODBC_VERSION,
-    //     // sqlOvOdbc.cast(),
-    //     // 100,
-    //   ),
-    //   handle: _hEnv,
-    //   operationType: SQL_HANDLE_ENV,
-    //   onException: EnvironmentAllocationException(),
-    // );
     calloc
-      ..free(sqlOvOdbc)
       ..free(pHEnv)
       ..free(sqlNullHandle);
   }
@@ -110,59 +82,6 @@ class DartOdbc {
     }
 
     throw ODBCException('ODBC driver not found');
-  }
-
-  bool _getOdbcDriverFromOdbcIniUnix() {
-    final file = File('/etc/odbcinst.ini');
-    if (!file.existsSync()) {
-      return false;
-    }
-
-    final lines = file.readAsLinesSync();
-    for (final line in lines) {
-      final proecss = Process.runSync('odbcinst', ['-q', '-d', _dsn!]);
-      if (proecss.exitCode != 0) {
-        throw ODBCException(proecss.stderr.toString());
-      }
-      final entry = proecss.stdout.toString();
-      if (line.contains(entry)) {}
-      final index = lines.indexOf(line);
-      for (var i = index + 1; i < lines.length; i++) {
-        final nextLine = lines[i];
-        if (nextLine.contains('Driver=')) {
-          if (nextLine.isEmpty || nextLine.startsWith('[')) {
-            break;
-          }
-          __sql = LibOdbcExt(DynamicLibrary.open(nextLine.split('=')[1]));
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  bool _getOdbcDriverWindows(String registryKey) {
-    final process = Process.runSync('reg', [
-      'query',
-      '$registryKey\\$_dsn',
-      '/v',
-      'Driver',
-    ]);
-    if (process.exitCode != 0) {
-      return false;
-    } else {
-      try {
-        __sql = LibOdbcExt(
-          DynamicLibrary.open(
-            process.stdout.toString().split('   ').last.trim(),
-          ),
-        );
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
   }
 
   /// Connect to a database
@@ -230,8 +149,7 @@ class DartOdbc {
     final cConnectionString =
         connectionString.toNativeUtf16().cast<UnsignedShort>();
 
-    final outConnectionString =
-        calloc.allocate<UnsignedShort>(1024); // Adjust size as necessary
+    final outConnectionString = calloc.allocate<UnsignedShort>(256);
     final outConnectionStringLen = calloc.allocate<Short>(sizeOf<Short>());
 
     tryOdbc(
@@ -241,7 +159,7 @@ class DartOdbc {
         cConnectionString,
         SQL_NTS,
         outConnectionString,
-        1024,
+        256,
         outConnectionStringLen,
         SQL_DRIVER_NOPROMPT,
       ),

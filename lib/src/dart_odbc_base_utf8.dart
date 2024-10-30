@@ -20,14 +20,14 @@ class DartOdbcUtf8 extends DartOdbc {
   @override
   void _initialize({int? version}) {
     final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
-      ..value = version ?? 0;
+      ..value = version ?? SQL_OV_ODBC3_80;
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
       ..value = SQL_NULL_HANDLE;
     final pHEnv = calloc.allocate<SQLHANDLE>(sizeOf<SQLHANDLE>());
     tryOdbc(
-      _sql.SQLAllocHandle(
-        SQL_HANDLE_ENV,
-        Pointer.fromAddress(sqlNullHandle.address),
+      _sql.SQLAllocEnv(
+        // SQL_HANDLE_ENV,
+        // Pointer.fromAddress(sqlNullHandle.address),
         pHEnv,
       ),
       operationType: SQL_HANDLE_ENV,
@@ -36,19 +36,19 @@ class DartOdbcUtf8 extends DartOdbc {
     );
     _hEnv = pHEnv.value;
 
-    if (version != null) {
-      tryOdbc(
-        _sql.SQLSetEnvAttr(
-          _hEnv,
-          SQL_ATTR_ODBC_VERSION,
-          Pointer.fromAddress(sqlOvOdbc.address),
-          0,
-        ),
-        handle: _hEnv,
-        operationType: SQL_HANDLE_ENV,
-        onException: EnvironmentAllocationException(),
-      );
-    }
+    // if (version != null) {
+    //   tryOdbc(
+    //     _sql.SQLSetEnvAttr(
+    //       _hEnv,
+    //       SQL_ATTR_ODBC_VERSION,
+    //       Pointer.fromAddress(sqlOvOdbc.address),
+    //       0,
+    //     ),
+    //     handle: _hEnv,
+    //     operationType: SQL_HANDLE_ENV,
+    //     onException: EnvironmentAllocationException(),
+    //   );
+    // }
     calloc
       ..free(sqlOvOdbc)
       ..free(pHEnv)

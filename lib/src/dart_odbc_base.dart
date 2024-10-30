@@ -78,15 +78,14 @@ class DartOdbc {
   SQLHDBC _hConn = nullptr;
 
   void _initialize({int? version}) {
-    final sqlOvOdbc = calloc.allocate<SQLULEN>(sizeOf<SQLULEN>())
-      ..value = version ?? 0;
-    final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>())
-      ..value = SQL_NULL_HANDLE;
+    final sqlOvOdbc = calloc.allocate<Int>(sizeOf<Int>())
+      ..value = version ?? SQL_OV_ODBC3_80;
+    final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>());
     final pHEnv = calloc.allocate<SQLHANDLE>(sizeOf<SQLHANDLE>());
     tryOdbc(
-      _sql.SQLAllocHandle(
-        SQL_HANDLE_ENV,
-        Pointer.fromAddress(sqlNullHandle.address),
+      _sql.SQLAllocEnv(
+        // SQL_HANDLE_ENV,
+        // sqlNullHandle.cast(),
         pHEnv,
       ),
       operationType: SQL_HANDLE_ENV,
@@ -95,19 +94,17 @@ class DartOdbc {
     );
     _hEnv = pHEnv.value;
 
-    if (version != null) {
-      tryOdbc(
-        _sql.SQLSetEnvAttr(
-          _hEnv,
-          SQL_ATTR_ODBC_VERSION,
-          Pointer.fromAddress(sqlOvOdbc.address),
-          0,
-        ),
-        handle: _hEnv,
-        operationType: SQL_HANDLE_ENV,
-        onException: EnvironmentAllocationException(),
-      );
-    }
+    // tryOdbc(
+    //   _sql.SQLAllocEnv(
+    //     // _hEnv,
+    //     // SQL_ATTR_ODBC_VERSION,
+    //     // sqlOvOdbc.cast(),
+    //     // 100,
+    //   ),
+    //   handle: _hEnv,
+    //   operationType: SQL_HANDLE_ENV,
+    //   onException: EnvironmentAllocationException(),
+    // );
     calloc
       ..free(sqlOvOdbc)
       ..free(pHEnv)
@@ -428,9 +425,9 @@ class DartOdbc {
     int operationType = SQL_HANDLE_STMT,
     ODBCException? onException,
   }) {
-    onException ??= ODBCException('ODBC error');
-    onException.code = status;
-    if (status == SQL_ERROR) {
+    if (status < 0) {
+      onException ??= ODBCException('ODBC error');
+      onException.code = status;
       if (handle != null) {
         final nativeErr = calloc.allocate<Int>(sizeOf<Int>())..value = status;
         final message = '1' * 10000;

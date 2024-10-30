@@ -24,15 +24,18 @@ class DartOdbc {
     String? dsn,
     String? pathToDriver,
     int? version,
+    @Deprecated(
+      'It is not required to use this anymore as the issue has been fixed',
+    )
     UtfType utfType = UtfType.utf16,
   }) {
-    if (utfType == UtfType.utf8) {
-      return DartOdbcUtf8(
-        dsn: dsn,
-        pathToDriver: pathToDriver,
-        version: version,
-      );
-    }
+    // if (utfType == UtfType.utf8) {
+    //   return DartOdbcUtf8(
+    //     dsn: dsn,
+    //     pathToDriver: pathToDriver,
+    //     version: version,
+    //   );
+    // }
 
     return DartOdbc._internal(
       dsn: dsn,
@@ -46,22 +49,12 @@ class DartOdbc {
     if (pathToDriver != null) {
       __sql = LibOdbcExt(DynamicLibrary.open(pathToDriver));
     } else {
-      // auto detecting odbc driver from odbc.ini
-      if (Platform.isLinux || Platform.isMacOS) {
-        _getOdbcDriverFromOdbcIniUnix();
+      if (Platform.isLinux) {
+        __sql = LibOdbcExt(DynamicLibrary.open('libodbc.so'));
       } else if (Platform.isWindows) {
-        final regKeys = [
-          r'HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ODBC\ODBC.INI',
-          r'HKEY_LOCAL_MACHINE\SOFTWARE\ODBC\ODBC.INI',
-          r'HKEY_CURRENT_USER\SOFTWARE\ODBC\ODBC.INI',
-          r'HKEY_CURRENT_USER\Software\Wow6432Node\ODBC\ODBC.INI',
-        ];
-        var result = false;
-        var i = 0;
-        do {
-          result = _getOdbcDriverWindows(regKeys[i]);
-          i++;
-        } while (!result && i < regKeys.length);
+        __sql = LibOdbcExt(DynamicLibrary.open('odbc32.dll'));
+      } else if (Platform.isMacOS) {
+        __sql = LibOdbcExt(DynamicLibrary.open('libodbc.dylib'));
       }
 
       if (__sql == null) {

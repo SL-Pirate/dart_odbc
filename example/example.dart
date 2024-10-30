@@ -21,9 +21,8 @@ Future<void> run(List<String> args) async {
 
   final odbc = DartOdbc(
     dsn: dsn,
-    pathToDriver: '/usr/lib/libodbc.so',
     version: SQL_OV_ODBC2,
-    utfType: UtfType.utf8,
+    utfType: UtfType.utf16,
   );
   await odbc.connect(username: username!, password: password!);
 

@@ -13,9 +13,7 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
 ```dart
   final odbc = DartOdbc(
     dsn: '<your_dsn>',
-    pathToDriver: '<path_to_odbc_driver>',  // optional as this will be automatically detected
-    version=SQL_OV_ODBC3_80 // optional and should be set at your own risk
-    utfType: UtfType.utf16, // optional
+    pathToDriver: '<path_to_odbc_driver>',
   );
 ```
 
@@ -23,20 +21,7 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
 
 The DSN (Data Source Name) is the name you gave when setting up the driver manager.
 For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html)
-If not provided, the `pathToDriver` parameter should be provided, and the connection can only be made via connection string.
-
-### Path to ODBC Driver (optional)
-
-Path to the ODBC driver can be found in the ODBC driver manager.
-In windows this is a `.dll` file that is there in the installation folder of the ODBC driver.
-In linux this has an extension of `.so`.
-In macos this should have an extension of `.dylib`.
-
-### version (optional)
-
-The ODBC version can be specified using the `version` parameter.
-Definitions for these values can be found in the `LibODBC` class.
-Please note that some drivers may not work properly with manually setting version.
+If not provided, the connection can only be made via connection string.
 
 - Connect to the database by providing the DSN (Data Source Name) configured in the ODBC Driver Manager
 
@@ -122,20 +107,6 @@ final List<Map<String, String>> tables = await odbc.getTables();
 
 ```dart
   await odbc.disconnect();
-```
-
-### Troubleshooting
-
-#### ArgumentError (Invalid argument(s): Failed to lookup symbol '{Symbol}' in ...)
-
-- This error is thrown when the ODBC driver is not fully compatible with the version of the ODBC API being used
-- As a workaround, set the utfType to utf8 in `DartOdbc` constructor
-
-```dart
-  final odbc = DartOdbc(
-    dsn: '<your_dsn>',
-    utfType: UtfType.utf8,
-  );
 ```
 
 ### Accessing ODBC diver bindings directly

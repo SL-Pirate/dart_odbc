@@ -71,3 +71,8 @@
 ## 4.1.1+1
 
 - Improved auto-detecting drivers on windows
+
+## 4.1.2+1
+
+- Major bug fixes for most of the issues
+- Implemented using driver manager as a middleware

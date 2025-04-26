@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:ffi/ffi.dart';
 
@@ -66,6 +67,21 @@ class OdbcConversions {
       throw Exception('Unsupported data type: ${value.runtimeType}');
     }
   }
+
+  /// Convert a hex string to a Uint8List
+  static Uint8List hexToUint8List(String hex) {
+    final bytes = <int>[];
+    for (var i = 0; i < hex.length; i += 2) {
+      final couple = hex.substring(i, i + 2);
+      if (couple.length != 2 || !RegExp(r'^[0-9A-Fa-f]{2}$').hasMatch(couple)) {
+        break;
+      }
+      final byte = int.parse(couple, radix: 16);
+      bytes.add(byte);
+    }
+
+    return Uint8List.fromList(bytes);
+  }
 }
 
 /// A model that will be used to return the response of to pointer method
@@ -103,6 +119,13 @@ class ColumnType {
 
   /// Size of the column
   final int? size;
+
+  /// Check if the column type is a binary type
+  bool isBinary() {
+    return type == SQL_BINARY ||
+        type == SQL_VARBINARY ||
+        type == SQL_LONGVARBINARY;
+  }
 }
 
 /// Extension class for dart [String]

@@ -95,6 +95,24 @@ If not provided, the connection can only be made via connection string.
 
 - Result will be a `Future` of `List` of `Map` objects (`Future<List<Map<String, dynamic>>>`) where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
 
+### Working with binary data
+
+- ODBC supports binary data types like `BINARY` and `VARBINARY`.
+- To work with binary data, you must provide the `ColumnType` for the column in the `columnConfig` parameter of the `execute` method on `DartOdbc` class
+
+```dart
+  result = await odbc.execute(
+    'SELECT * FROM USERS WHERE UID = ?',
+    params: [1],
+    columnConfig: {
+      'BINARY_COLUMN': ColumnType(type: SQL_BINARY, size: 100),
+      'VARBINARY_COLUMN': ColumnType(type: SQL_VARBINARY, size: 200),
+    },
+  );
+```
+
+- The resulting colummn will yield a `Uint8List` object.
+
 ### Get Tables
 
 ```dart

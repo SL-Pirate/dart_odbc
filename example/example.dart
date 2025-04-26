@@ -26,16 +26,6 @@ Future<void> run(List<String> args) async {
     await odbc.execute('USE $db');
   }
 
-  List<Map<String, dynamic>> result = await odbc.execute(
-    args[0], //  <-- SQL query
-    params: args.sublist(1), // <-- SQL query parameters
-    columnConfig: {
-      "COL1": ColumnType(size: 100),
-    },
-  );
-
-  print(result);
-
   // Assume a table like this
   // +-----+-------+-------------+
   // | UID | NAME  | DESCRIPTION |
@@ -55,10 +45,20 @@ Future<void> run(List<String> args) async {
   /// This is only needed when the data fetching is not working as expected
   /// Only the columns with issues need to be provided
   //   columnConfig: {
-  //     'NAME': ColumnType(size: 150),
-  //     'DESCRIPTION': ColumnType(type: SQL_C_WCHAR, size: 500),
+  //     'IMAGE': ColumnType(type: SQL_BINARY, size: 100),
   //   },
   // );
+
+  List<Map<String, dynamic>> result = await odbc.execute(
+    args[0], //  <-- SQL query
+    params: args.sublist(1), // <-- SQL query parameters
+    columnConfig: {
+      "COL1": ColumnType(size: 100),
+      'data': ColumnType(type: SQL_VARBINARY, size: 100),
+    },
+  );
+
+  print(result);
 
   // finally disconnect from the db
   await odbc.disconnect();

@@ -76,3 +76,7 @@
 
 - Major bug fixes for most of the issues
 - Implemented using driver manager as a middleware
+
+## 4.2.0+1
+
+- Implemented better support for working with binary data

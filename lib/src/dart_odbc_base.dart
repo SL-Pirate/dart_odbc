@@ -443,11 +443,16 @@ class DartOdbc {
           continue;
         }
         // removing trailing zeros before converting to string
-        final charCodes = columnValue
-            .asTypedList(columnValueLength.value)
-            .toList()
-          ..removeWhere((e) => e == 0);
-        row[columnNames[i - 1]] = String.fromCharCodes(charCodes);
+        late final List<int> charCodes;
+        if (columnType != null && columnType.isBinary()) {
+          charCodes = columnValue.asTypedList(columnType.size ?? 100).toList();
+          row[columnNames[i - 1]] =
+              OdbcConversions.hexToUint8List(String.fromCharCodes(charCodes));
+        } else {
+          charCodes = columnValue.asTypedList(columnValueLength.value).toList()
+            ..removeWhere((e) => e == 0);
+          row[columnNames[i - 1]] = String.fromCharCodes(charCodes);
+        }
 
         // free memory
         calloc

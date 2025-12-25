@@ -1,6 +1,6 @@
 CREATE DATABASE odbc_test;
 
------------------- Run the following commands seperately from the initial command
+------------------ Run the following commands separately from the initial command
 
 USE odbc_test;
 

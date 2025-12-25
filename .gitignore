@@ -17,3 +17,6 @@ windows/
 
 # env
 .env
+
+# temporary file created by tests
+test.png

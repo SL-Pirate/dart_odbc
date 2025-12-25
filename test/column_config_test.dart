@@ -15,10 +15,7 @@ void main() {
       'SELECT data FROM BINARY_TABLE WHERE id = ?',
       params: [1],
       columnConfig: {
-        'data': ColumnType(
-          type: SQL_VARBINARY,
-          // size: 100,
-        ),
+        'data': ColumnType(type: SQL_VARBINARY),
       },
     );
 

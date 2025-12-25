@@ -94,3 +94,7 @@
 - Major improvements to better align the library with the ODBC standard, improving performance, usability, and safety. Thanks to [ccisnedev](https://github.com/ccisnedev) for co-authoring.
 - Result fetching now follows the ODBC streaming model (incremental SQLGetData reads), eliminating truncation issues and improving correctness for large values.
 - Column buffer sizing is now treated as a per-chunk fetch hint rather than a hard size limit.
+
+## 5.0.1
+
+- Fixed some minor issues flagged by pana test

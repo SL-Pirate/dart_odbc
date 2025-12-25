@@ -446,7 +446,6 @@ class DartOdbc {
 
             if (columnValueLength.value == SQL_NULL_DATA) {
               // null column
-              collected.clear();
               break;
             }
 
@@ -498,7 +497,7 @@ class DartOdbc {
             );
 
             if (columnValueLength.value == SQL_NULL_DATA) {
-              collectedUnits.clear();
+              // null column
               break;
             }
 

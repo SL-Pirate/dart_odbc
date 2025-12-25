@@ -2,6 +2,7 @@
 
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
@@ -95,6 +96,7 @@ class DartOdbc {
     if (_dsn == null) {
       throw ODBCException('DSN not provided');
     }
+    final dsnLocal = _dsn!;
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
@@ -103,14 +105,14 @@ class DartOdbc {
       onException: HandleException(),
     );
     _hConn = pHConn.value;
-    final cDsn = _dsn!.toNativeUtf16().cast<UnsignedShort>();
+    final cDsn = dsnLocal.toNativeUtf16().cast<UnsignedShort>();
     final cUsername = username.toNativeUtf16().cast<UnsignedShort>();
     final cPassword = password.toNativeUtf16().cast<UnsignedShort>();
     tryOdbc(
       _sql.SQLConnectW(
         _hConn,
         cDsn,
-        _dsn!.length,
+        dsnLocal.length,
         cUsername,
         username.length,
         cPassword,
@@ -423,41 +425,111 @@ class DartOdbc {
       for (var i = 1; i <= columnCount.value; i++) {
         final columnType = columnConfig[columnNames[i - 1]];
         final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
-        final columnValue = calloc.allocate<Uint16>(
-          sizeOf<Uint16>() * (columnType?.size ?? 256),
-        );
-        tryOdbc(
-          _sql.SQLGetData(
-            hStmt,
-            i,
-            /* columnType?.type ?? */ SQL_WCHAR,
-            columnValue.cast(),
-            columnType?.size ?? 256,
-            columnValueLength,
-          ),
-          handle: hStmt,
-          onException: FetchException(),
-        );
-        if (columnValueLength.value == SQL_NULL_DATA) {
-          row[columnNames[i - 1]] = null;
-          continue;
-        }
-        // removing trailing zeros before converting to string
-        late final List<int> charCodes;
+
+        // If the user declared the column as binary, request raw bytes (SQL_C_BINARY)
+        // and use a byte buffer. Otherwise request WCHAR (UTF-16) and use a
+        // Uint16 buffer. Also make sure to pass buffer lengths in BYTES to SQLGetData
+        // and interpret the returned length accordingly.
         if (columnType != null && columnType.isBinary()) {
-          charCodes = columnValue.asTypedList(columnType.size ?? 100).toList();
-          row[columnNames[i - 1]] =
-              OdbcConversions.hexToUint8List(String.fromCharCodes(charCodes));
+          // incremental read for binary data
+          final initialBuf = (columnType.size ?? 256);
+          var collected = <int>[];
+          var bufSize = initialBuf;
+          var done = false;
+          while (!done) {
+            final buf = calloc.allocate<Uint8>(bufSize);
+            tryOdbc(
+              _sql.SQLGetData(hStmt, i, SQL_C_BINARY, buf.cast(), bufSize, columnValueLength),
+              handle: hStmt,
+              onException: FetchException(),
+            );
+
+            if (columnValueLength.value == SQL_NULL_DATA) {
+              // null column
+              calloc.free(buf);
+              collected = [];
+              done = true;
+              break;
+            }
+
+            // if driver returned SQL_NO_TOTAL or a size larger than buffer,
+            // SQLGetData will fill up to bufSize; we append the bytes returned
+            final returned = columnValueLength.value;
+            final toTake = (returned > 0 && returned < bufSize) ? returned : bufSize;
+            if (toTake > 0) {
+              collected.addAll(buf.asTypedList(toTake));
+            }
+
+            // If returned is 0 and driver didn't set SQL_NO_TOTAL, consider done
+            if (returned != SQL_NO_TOTAL && returned <= bufSize) {
+              // finished
+              calloc.free(buf);
+              done = true;
+              break;
+            }
+
+            // otherwise, driver indicates more data or SQL_NO_TOTAL; increase buffer and loop
+            calloc.free(buf);
+            bufSize = bufSize * 2; // exponential growth
+          }
+
+          if (collected.isEmpty) {
+            row[columnNames[i - 1]] = null;
+          } else {
+            row[columnNames[i - 1]] = Uint8List.fromList(collected);
+          }
+          calloc.free(columnValueLength);
         } else {
-          charCodes = columnValue.asTypedList(columnValueLength.value).toList()
-            ..removeWhere((e) => e == 0);
-          row[columnNames[i - 1]] = String.fromCharCodes(charCodes);
+          // incremental read for wide char (UTF-16) data
+          var collectedUnits = <int>[];
+          var unitBuf = (columnType?.size ?? 256);
+          var done = false;
+          while (!done) {
+            final buf = calloc.allocate<Uint16>(unitBuf);
+            final bufBytes = unitBuf * sizeOf<Uint16>();
+            tryOdbc(
+              _sql.SQLGetData(hStmt, i, SQL_WCHAR, buf.cast(), bufBytes, columnValueLength),
+              handle: hStmt,
+              onException: FetchException(),
+            );
+
+            if (columnValueLength.value == SQL_NULL_DATA) {
+              calloc.free(buf);
+              collectedUnits = [];
+              done = true;
+              break;
+            }
+
+            final returnedBytes = columnValueLength.value;
+            // if driver returns SQL_NO_TOTAL, we assume bufBytes filled
+            final unitsReturned = (returnedBytes > 0) ? (returnedBytes ~/ sizeOf<Uint16>()) : unitBuf;
+            if (unitsReturned > 0) {
+              collectedUnits.addAll(buf.asTypedList(unitsReturned));
+            }
+
+            if (returnedBytes != SQL_NO_TOTAL && returnedBytes <= bufBytes) {
+              // finished
+              calloc.free(buf);
+              done = true;
+              break;
+            }
+
+            // need more
+            calloc.free(buf);
+            unitBuf = unitBuf * 2;
+          }
+
+          if (collectedUnits.isEmpty) {
+            row[columnNames[i - 1]] = null;
+          } else {
+            collectedUnits.removeWhere((e) => e == 0);
+            row[columnNames[i - 1]] = String.fromCharCodes(collectedUnits);
+          }
+          calloc.free(columnValueLength);
         }
 
-        // free memory
-        calloc
-          ..free(columnValue)
-          ..free(columnValueLength);
+        // columnValue and columnValueLength are freed inside each branch
+        // to avoid double-free and scope issues.
       }
 
       rows.add(row);

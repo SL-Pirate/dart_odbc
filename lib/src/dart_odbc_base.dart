@@ -1,3 +1,4 @@
+//
 // ignore_for_file: lines_longer_than_80_chars
 
 import 'dart:ffi';
@@ -16,7 +17,6 @@ class DartOdbc {
   /// if [pathToDriver] is not provided, the driver will be auto-detected from the ODBC.ini file.
   /// The [dsn] parameter is the name of the DSN to connect to.
   /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
-  /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
   factory DartOdbc({String? dsn, String? pathToDriver}) {
@@ -139,7 +139,8 @@ class DartOdbc {
     final cConnectionString =
         connectionString.toNativeUtf16().cast<UnsignedShort>();
 
-    final outConnectionString = calloc.allocate<UnsignedShort>(256);
+    final outConnectionString =
+        calloc.allocate<UnsignedShort>(defaultBufferSize);
     final outConnectionStringLen = calloc.allocate<Short>(sizeOf<Short>());
 
     tryOdbc(
@@ -149,7 +150,7 @@ class DartOdbc {
         cConnectionString,
         SQL_NTS,
         outConnectionString,
-        256,
+        defaultBufferSize,
         outConnectionStringLen,
         SQL_DRIVER_NOPROMPT,
       ),
@@ -320,7 +321,7 @@ class DartOdbc {
   /// The [operationType] parameter is the type of operation that caused the
   /// error.
   /// If [handle] is not provided, the error message will not be descriptive.
-  void tryOdbc(
+  int tryOdbc(
     int status, {
     SQLHANDLE? handle,
     int operationType = SQL_HANDLE_STMT,
@@ -346,7 +347,7 @@ class DartOdbc {
             message.length,
             nullptr,
           );
-        } catch (e) {
+        } on (Exception,) {
           // ignore
         }
 
@@ -360,6 +361,8 @@ class DartOdbc {
       }
 
       throw onException;
+    } else {
+      return status;
     }
   }
 
@@ -378,13 +381,14 @@ class DartOdbc {
     for (var i = 1; i <= columnCount.value; i++) {
       final columnNameLength =
           calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
-      final columnName = calloc.allocate<Uint16>(sizeOf<Uint16>() * 256);
+      final columnName =
+          calloc.allocate<Uint16>(defaultBufferSize ~/ sizeOf<Uint16>());
       tryOdbc(
         _sql.SQLDescribeColW(
           hStmt,
           i,
           columnName.cast(),
-          256,
+          defaultBufferSize,
           columnNameLength,
           nullptr,
           nullptr,
@@ -408,57 +412,57 @@ class DartOdbc {
 
     final rows = <Map<String, dynamic>>[];
 
-    while (_sql.SQLFetch(hStmt) == SQL_SUCCESS) {
+    // keeping outside the loop to reduce overhead in memory allocation
+    final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
+
+    while (true) {
+      final rc = _sql.SQLFetch(hStmt);
+      if (rc < 0 || rc == SQL_NO_DATA) break;
+
       final row = <String, dynamic>{};
       for (var i = 1; i <= columnCount.value; i++) {
         final columnType = columnConfig[columnNames[i - 1]];
-        final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
 
-        // If the user declared the column as binary, request raw bytes (SQL_C_BINARY)
-        // and use a byte buffer. Otherwise request WCHAR (UTF-16) and use a
-        // Uint16 buffer. Also make sure to pass buffer lengths in BYTES to SQLGetData
-        // and interpret the returned length accordingly.
         if (columnType != null && columnType.isBinary()) {
           // incremental read for binary data
-          final initialBuf = (columnType.size ?? 256);
-          var collected = <int>[];
-          var bufSize = initialBuf;
-          var done = false;
-          while (!done) {
-            final buf = calloc.allocate<Uint8>(bufSize);
-            tryOdbc(
-              _sql.SQLGetData(hStmt, i, SQL_C_BINARY, buf.cast(), bufSize, columnValueLength),
+          final collected = <int>[];
+
+          final buf =
+              calloc.allocate<Uint8>(columnType.size ?? defaultBufferSize);
+
+          while (true) {
+            final status = tryOdbc(
+              _sql.SQLGetData(
+                hStmt,
+                i,
+                SQL_C_BINARY,
+                buf.cast(),
+                columnType.size ?? defaultBufferSize,
+                columnValueLength,
+              ),
               handle: hStmt,
               onException: FetchException(),
             );
 
             if (columnValueLength.value == SQL_NULL_DATA) {
               // null column
-              calloc.free(buf);
-              collected = [];
-              done = true;
+              collected.clear();
               break;
             }
 
-            // if driver returned SQL_NO_TOTAL or a size larger than buffer,
-            // SQLGetData will fill up to bufSize; we append the bytes returned
-            final returned = columnValueLength.value;
-            final toTake = (returned > 0 && returned < bufSize) ? returned : bufSize;
-            if (toTake > 0) {
-              collected.addAll(buf.asTypedList(toTake));
+            final returnedBytes = columnValueLength.value;
+            final unitsReturned = returnedBytes == SQL_NO_TOTAL
+                ? columnType.size ?? defaultBufferSize
+                : (returnedBytes ~/ sizeOf<Uint8>())
+                    .clamp(0, columnType.size ?? defaultBufferSize);
+
+            if (unitsReturned > 0) {
+              collected.addAll(buf.asTypedList(unitsReturned));
             }
 
-            // If returned is 0 and driver didn't set SQL_NO_TOTAL, consider done
-            if (returned != SQL_NO_TOTAL && returned <= bufSize) {
-              // finished
-              calloc.free(buf);
-              done = true;
+            if (status == SQL_SUCCESS) {
               break;
             }
-
-            // otherwise, driver indicates more data or SQL_NO_TOTAL; increase buffer and loop
-            calloc.free(buf);
-            bufSize = bufSize * 2; // exponential growth
           }
 
           if (collected.isEmpty) {
@@ -466,46 +470,55 @@ class DartOdbc {
           } else {
             row[columnNames[i - 1]] = Uint8List.fromList(collected);
           }
-          calloc.free(columnValueLength);
+
+          calloc.free(buf);
         } else {
+          final collectedUnits = <int>[];
+
           // incremental read for wide char (UTF-16) data
-          var collectedUnits = <int>[];
-          var unitBuf = (columnType?.size ?? 256);
-          var done = false;
-          while (!done) {
-            final buf = calloc.allocate<Uint16>(unitBuf);
-            final bufBytes = unitBuf * sizeOf<Uint16>();
-            tryOdbc(
-              _sql.SQLGetData(hStmt, i, SQL_WCHAR, buf.cast(), bufBytes, columnValueLength),
+          final unitBuf =
+              (columnType?.size ?? defaultBufferSize) ~/ sizeOf<Uint16>();
+
+          // unitBuf + 1 to respect the null terminator
+          final buf = calloc.allocate<Uint16>(unitBuf);
+          final bufBytes = unitBuf * sizeOf<Uint16>();
+
+          while (true) {
+            final status = tryOdbc(
+              _sql.SQLGetData(
+                hStmt,
+                i,
+                SQL_WCHAR,
+                buf.cast(),
+                bufBytes,
+                columnValueLength,
+              ),
               handle: hStmt,
               onException: FetchException(),
             );
 
             if (columnValueLength.value == SQL_NULL_DATA) {
-              calloc.free(buf);
-              collectedUnits = [];
-              done = true;
+              collectedUnits.clear();
               break;
             }
 
             final returnedBytes = columnValueLength.value;
-            // if driver returns SQL_NO_TOTAL, we assume bufBytes filled
-            final unitsReturned = (returnedBytes > 0) ? (returnedBytes ~/ sizeOf<Uint16>()) : unitBuf;
+            final maxUnitsInBuffer = unitBuf;
+
+            final unitsReturned = returnedBytes == SQL_NO_TOTAL
+                ? maxUnitsInBuffer
+                : (returnedBytes ~/ sizeOf<Uint16>())
+                    .clamp(0, maxUnitsInBuffer);
+
             if (unitsReturned > 0) {
               collectedUnits.addAll(buf.asTypedList(unitsReturned));
             }
 
-            if (returnedBytes != SQL_NO_TOTAL && returnedBytes <= bufBytes) {
-              // finished
-              calloc.free(buf);
-              done = true;
+            if (status == SQL_SUCCESS) {
               break;
             }
-
-            // need more
-            calloc.free(buf);
-            unitBuf = unitBuf * 2;
           }
+          calloc.free(buf);
 
           if (collectedUnits.isEmpty) {
             row[columnNames[i - 1]] = null;
@@ -513,11 +526,7 @@ class DartOdbc {
             collectedUnits.removeWhere((e) => e == 0);
             row[columnNames[i - 1]] = String.fromCharCodes(collectedUnits);
           }
-          calloc.free(columnValueLength);
         }
-
-        // columnValue and columnValueLength are freed inside each branch
-        // to avoid double-free and scope issues.
       }
 
       rows.add(row);
@@ -525,7 +534,9 @@ class DartOdbc {
 
     // free memory
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
-    calloc.free(columnCount);
+    calloc
+      ..free(columnCount)
+      ..free(columnValueLength);
 
     return rows;
   }

@@ -2,15 +2,15 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 import 'package:test/test.dart';
 
-import '../test_runner.dart';
+import 'test_helper.dart';
 
 void main() {
   late DotEnv env;
-  late TestRunner runner;
+  late TestHelper runner;
 
   setUpAll(() {
     env = DotEnv()..load(['.env']);
-    runner = TestRunner(
+    runner = TestHelper(
       DartOdbc(dsn: env['DSN']),
     );
   });

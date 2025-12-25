@@ -1,9 +1,26 @@
+// False positive because this is only a helper for testing
+// ignore_for_file: unreachable_from_main
+
 import 'package:dart_odbc/dart_odbc.dart';
+import 'package:dotenv/dotenv.dart';
 
-class TestRunner {
-  TestRunner(this.odbc);
+class TestHelper {
+  TestHelper([DartOdbc? odbc]) {
+    if (odbc != null) this.odbc = odbc;
+  }
 
-  final DartOdbc odbc;
+  late DartOdbc odbc;
+  late final DotEnv env;
+
+  Future<void> initialize() async {
+    env = DotEnv()..load(['.env']);
+    odbc = DartOdbc(dsn: env['DSN']);
+    await connect(
+      username: env['USERNAME']!,
+      password: env['PASSWORD']!,
+      database: env['DATABASE'],
+    );
+  }
 
   Future<void> connect({
     required String username,
@@ -31,3 +48,5 @@ class TestRunner {
 
   Future<void> disconnect() => odbc.disconnect();
 }
+
+void main() {}

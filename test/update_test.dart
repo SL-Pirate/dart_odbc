@@ -1,47 +1,34 @@
-import 'package:dart_odbc/dart_odbc.dart';
-import 'package:dotenv/dotenv.dart';
 import 'package:test/test.dart';
 
-import '../test_runner.dart';
+import 'test_helper.dart';
 
 void main() {
-  late TestRunner runner;
-  late DotEnv env;
+  final helper = TestHelper();
 
-  setUpAll(() async {
-    env = DotEnv()..load(['.env']);
-    runner = TestRunner(DartOdbc(dsn: env['DSN']));
-    await runner.connect(
-      username: env['USERNAME']!,
-      password: env['PASSWORD']!,
-      database: env['DATABASE'],
-    );
-  });
+  setUpAll(helper.initialize);
 
-  tearDownAll(() async {
-    await runner.disconnect();
-  });
+  tearDownAll(helper.disconnect);
 
   test('update modifies an existing row', () async {
     const uid = 1002;
 
     // Ensure row exists
-    await runner.query(
+    await helper.query(
       'DELETE FROM USERS WHERE UID = ?',
       params: [uid],
     );
 
-    await runner.query(
+    await helper.query(
       'INSERT INTO USERS (UID, NAME, DESCRIPTION) VALUES (?, ?, ?)',
       params: [uid, 'Dana', 'Before update'],
     );
 
-    await runner.query(
+    await helper.query(
       'UPDATE USERS SET DESCRIPTION = ? WHERE UID = ?',
       params: ['After update', uid],
     );
 
-    final result = await runner.query(
+    final result = await helper.query(
       'SELECT DESCRIPTION FROM USERS WHERE UID = ?',
       params: [uid],
     );

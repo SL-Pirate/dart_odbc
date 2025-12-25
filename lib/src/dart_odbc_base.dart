@@ -347,7 +347,7 @@ class DartOdbc {
             message.length,
             nullptr,
           );
-        } on (Exception,) {
+        } on Exception {
           // ignore
         }
 

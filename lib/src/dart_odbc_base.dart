@@ -478,7 +478,6 @@ class DartOdbc {
           final unitBuf =
               (columnType?.size ?? defaultBufferSize) ~/ sizeOf<Uint16>();
 
-          // unitBuf + 1 to respect the null terminator
           final buf = calloc.allocate<Uint16>(unitBuf);
           final bufBytes = unitBuf * sizeOf<Uint16>();
 

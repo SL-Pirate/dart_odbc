@@ -1,7 +1,9 @@
+//
 // ignore_for_file: lines_longer_than_80_chars
 
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
@@ -15,23 +17,10 @@ class DartOdbc {
   /// if [pathToDriver] is not provided, the driver will be auto-detected from the ODBC.ini file.
   /// The [dsn] parameter is the name of the DSN to connect to.
   /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
-  /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  factory DartOdbc({
-    String? dsn,
-    String? pathToDriver,
-    @Deprecated('Is not used anymore') int? version,
-    @Deprecated(
-      'It is not required to use this anymore as the issue has been fixed',
-    )
-    UtfType utfType = UtfType.utf16,
-  }) {
-    return DartOdbc._internal(
-      dsn: dsn,
-      pathToDriver: pathToDriver,
-      version: version,
-    );
+  factory DartOdbc({String? dsn, String? pathToDriver}) {
+    return DartOdbc._internal(dsn: dsn, pathToDriver: pathToDriver);
   }
 
   DartOdbc._internal({String? dsn, String? pathToDriver, int? version})
@@ -95,6 +84,7 @@ class DartOdbc {
     if (_dsn == null) {
       throw ODBCException('DSN not provided');
     }
+    final dsnLocal = _dsn!;
     final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
@@ -103,14 +93,14 @@ class DartOdbc {
       onException: HandleException(),
     );
     _hConn = pHConn.value;
-    final cDsn = _dsn!.toNativeUtf16().cast<UnsignedShort>();
+    final cDsn = dsnLocal.toNativeUtf16().cast<UnsignedShort>();
     final cUsername = username.toNativeUtf16().cast<UnsignedShort>();
     final cPassword = password.toNativeUtf16().cast<UnsignedShort>();
     tryOdbc(
       _sql.SQLConnectW(
         _hConn,
         cDsn,
-        _dsn!.length,
+        dsnLocal.length,
         cUsername,
         username.length,
         cPassword,
@@ -149,7 +139,8 @@ class DartOdbc {
     final cConnectionString =
         connectionString.toNativeUtf16().cast<UnsignedShort>();
 
-    final outConnectionString = calloc.allocate<UnsignedShort>(256);
+    final outConnectionString =
+        calloc.allocate<UnsignedShort>(defaultBufferSize);
     final outConnectionStringLen = calloc.allocate<Short>(sizeOf<Short>());
 
     tryOdbc(
@@ -159,7 +150,7 @@ class DartOdbc {
         cConnectionString,
         SQL_NTS,
         outConnectionString,
-        256,
+        defaultBufferSize,
         outConnectionStringLen,
         SQL_DRIVER_NOPROMPT,
       ),
@@ -330,7 +321,7 @@ class DartOdbc {
   /// The [operationType] parameter is the type of operation that caused the
   /// error.
   /// If [handle] is not provided, the error message will not be descriptive.
-  void tryOdbc(
+  int tryOdbc(
     int status, {
     SQLHANDLE? handle,
     int operationType = SQL_HANDLE_STMT,
@@ -356,7 +347,7 @@ class DartOdbc {
             message.length,
             nullptr,
           );
-        } catch (e) {
+        } on Exception {
           // ignore
         }
 
@@ -370,6 +361,8 @@ class DartOdbc {
       }
 
       throw onException;
+    } else {
+      return status;
     }
   }
 
@@ -388,13 +381,14 @@ class DartOdbc {
     for (var i = 1; i <= columnCount.value; i++) {
       final columnNameLength =
           calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
-      final columnName = calloc.allocate<Uint16>(sizeOf<Uint16>() * 256);
+      final columnName =
+          calloc.allocate<Uint16>(defaultBufferSize ~/ sizeOf<Uint16>());
       tryOdbc(
         _sql.SQLDescribeColW(
           hStmt,
           i,
           columnName.cast(),
-          256,
+          defaultBufferSize,
           columnNameLength,
           nullptr,
           nullptr,
@@ -418,46 +412,119 @@ class DartOdbc {
 
     final rows = <Map<String, dynamic>>[];
 
-    while (_sql.SQLFetch(hStmt) == SQL_SUCCESS) {
+    // keeping outside the loop to reduce overhead in memory allocation
+    final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
+
+    while (true) {
+      final rc = _sql.SQLFetch(hStmt);
+      if (rc < 0 || rc == SQL_NO_DATA) break;
+
       final row = <String, dynamic>{};
       for (var i = 1; i <= columnCount.value; i++) {
         final columnType = columnConfig[columnNames[i - 1]];
-        final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
-        final columnValue = calloc.allocate<Uint16>(
-          sizeOf<Uint16>() * (columnType?.size ?? 256),
-        );
-        tryOdbc(
-          _sql.SQLGetData(
-            hStmt,
-            i,
-            /* columnType?.type ?? */ SQL_WCHAR,
-            columnValue.cast(),
-            columnType?.size ?? 256,
-            columnValueLength,
-          ),
-          handle: hStmt,
-          onException: FetchException(),
-        );
-        if (columnValueLength.value == SQL_NULL_DATA) {
-          row[columnNames[i - 1]] = null;
-          continue;
-        }
-        // removing trailing zeros before converting to string
-        late final List<int> charCodes;
-        if (columnType != null && columnType.isBinary()) {
-          charCodes = columnValue.asTypedList(columnType.size ?? 100).toList();
-          row[columnNames[i - 1]] =
-              OdbcConversions.hexToUint8List(String.fromCharCodes(charCodes));
-        } else {
-          charCodes = columnValue.asTypedList(columnValueLength.value).toList()
-            ..removeWhere((e) => e == 0);
-          row[columnNames[i - 1]] = String.fromCharCodes(charCodes);
-        }
 
-        // free memory
-        calloc
-          ..free(columnValue)
-          ..free(columnValueLength);
+        if (columnType != null && columnType.isBinary()) {
+          // incremental read for binary data
+          final collected = <int>[];
+
+          final buf =
+              calloc.allocate<Uint8>(columnType.size ?? defaultBufferSize);
+
+          while (true) {
+            final status = tryOdbc(
+              _sql.SQLGetData(
+                hStmt,
+                i,
+                SQL_C_BINARY,
+                buf.cast(),
+                columnType.size ?? defaultBufferSize,
+                columnValueLength,
+              ),
+              handle: hStmt,
+              onException: FetchException(),
+            );
+
+            if (columnValueLength.value == SQL_NULL_DATA) {
+              // null column
+              break;
+            }
+
+            final returnedBytes = columnValueLength.value;
+            final unitsReturned = returnedBytes == SQL_NO_TOTAL
+                ? columnType.size ?? defaultBufferSize
+                : (returnedBytes ~/ sizeOf<Uint8>())
+                    .clamp(0, columnType.size ?? defaultBufferSize);
+
+            if (unitsReturned > 0) {
+              collected.addAll(buf.asTypedList(unitsReturned));
+            }
+
+            if (status == SQL_SUCCESS) {
+              break;
+            }
+          }
+
+          if (collected.isEmpty) {
+            row[columnNames[i - 1]] = null;
+          } else {
+            row[columnNames[i - 1]] = Uint8List.fromList(collected);
+          }
+
+          calloc.free(buf);
+        } else {
+          final collectedUnits = <int>[];
+
+          // incremental read for wide char (UTF-16) data
+          final unitBuf =
+              (columnType?.size ?? defaultBufferSize) ~/ sizeOf<Uint16>();
+
+          final buf = calloc.allocate<Uint16>(unitBuf);
+          final bufBytes = unitBuf * sizeOf<Uint16>();
+
+          while (true) {
+            final status = tryOdbc(
+              _sql.SQLGetData(
+                hStmt,
+                i,
+                SQL_WCHAR,
+                buf.cast(),
+                bufBytes,
+                columnValueLength,
+              ),
+              handle: hStmt,
+              onException: FetchException(),
+            );
+
+            if (columnValueLength.value == SQL_NULL_DATA) {
+              // null column
+              break;
+            }
+
+            final returnedBytes = columnValueLength.value;
+            final maxUnitsInBuffer = unitBuf;
+
+            final unitsReturned = returnedBytes == SQL_NO_TOTAL
+                ? maxUnitsInBuffer
+                : (returnedBytes ~/ sizeOf<Uint16>())
+                    .clamp(0, maxUnitsInBuffer);
+
+            if (unitsReturned > 0) {
+              collectedUnits.addAll(buf.asTypedList(unitsReturned));
+            }
+
+            if (status == SQL_SUCCESS) {
+              break;
+            }
+          }
+          calloc.free(buf);
+
+          if (collectedUnits.isEmpty) {
+            row[columnNames[i - 1]] = null;
+          } else {
+            collectedUnits.removeWhere((e) => e == 0);
+            row[columnNames[i - 1]] = String.fromCharCodes(collectedUnits);
+          }
+        }
       }
 
       rows.add(row);
@@ -465,31 +532,10 @@ class DartOdbc {
 
     // free memory
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
-    calloc.free(columnCount);
+    calloc
+      ..free(columnCount)
+      ..free(columnValueLength);
 
     return rows;
-  }
-
-  /// On some platforms with some drivers, the ODBC driver may return
-  /// whitespace characters as unicode characters. This function will remove
-  /// these unicode whitespace characters from the result set.
-  @Deprecated('This method is no longer needed')
-  static List<Map<String, dynamic>> removeWhitespaceUnicodes(
-    List<Map<String, dynamic>> result,
-  ) {
-    return result.map((record) {
-      final sanitizedDict = <String, String>{};
-      record.forEach((key, value) {
-        // Trim all whitespace from keys and values using a regular expression
-        final sanitizedKey = key.replaceAll(RegExp(r'\s+'), '');
-        final cleanedKey = sanitizedKey.removeUnicodeWhitespaces();
-        final sanitizedValue =
-            value.toString().replaceAll(RegExp(r'[\s\u00A0]+'), '');
-        final cleanedValue = sanitizedValue.removeUnicodeWhitespaces();
-
-        sanitizedDict[cleanedKey] = cleanedValue;
-      });
-      return sanitizedDict;
-    }).toList();
   }
 }

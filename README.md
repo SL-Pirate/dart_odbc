@@ -133,12 +133,38 @@ final List<Map<String, String>> tables = await odbc.getTables();
 
 - For more information on the `ODBC` api go to [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc?view=sql-server-ver16)
 
-## Tested On
+## Testing
+
+### Current status
 
 This package has been tested to be working on the following Database Servers
 
 - Microsoft SQL Sever
 - Oracle
+
+### Local testing
+
+- This gives an overview on how you can setup the environment for testing with SQL Server on linux. For windows or mac, please check out the official documentation from Microsoft mentioned above.
+
+#### Getting SQL server up and running
+
+1. Get a working sql server. For this you can use a sql server instance from a managed provider or install it locally or on docker.
+2. For docker setup check out [this guide](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-ver17&tabs=cli&pivots=cs1-bash)
+
+#### Setting up `unixodbc` and the Microsoft SQL Server ODBC driver
+
+- For this, you can follow this [detailed guide](https://poweradm.com/connect-ms-sql-server-from-linux-odbc/)
+
+#### Setting up the environment variables and the testing database.
+
+1. Simply create a file `.env` in the project root, copy the content from the `test.env` to it and set the required variables according to your setup.
+2. Connect to your SQL server and execute the commands in the `test/testdb.sql` file which will initialize the `odbc_test` database (or you can name this database any name and override it in the `.env`) which will be used for testing.
+
+#### Run the tests
+
+- Simply execute the following command to run the tests with `dart cli`
+
+> $ dart test
 
 ## Support for other Database Servers
 

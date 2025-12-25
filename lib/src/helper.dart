@@ -52,7 +52,11 @@ class OdbcConversions {
   static OdbcPointer<dynamic> toPointer(dynamic value) {
     if (value is String) {
       final result = value.toNativeUtf16();
-      return OdbcPointer<Utf16>(result.cast(), result.length, value: value);
+      return OdbcPointer<Utf16>(
+        result.cast(),
+        result.length * sizeOf<Uint16>(),
+        value: value,
+      );
     } else if (value is int) {
       final result = calloc.allocate<Int>(sizeOf<Int>())..value = value;
       return OdbcPointer<Int>(result.cast(), sizeOf<Int>(), value: value);
@@ -117,7 +121,15 @@ class ColumnType {
   /// that start with SQL_C.
   final int? type;
 
-  /// Size of the column
+  /// Size (in bytes) of the buffer used when fetching this column.
+  ///
+  /// This controls the chunk size passed to SQLGetData. Larger values may
+  /// reduce the number of driver calls for large columns at the cost of
+  /// increased memory usage.
+  ///
+  /// If null, [defaultBufferSize] is used.
+  ///
+  /// Note: This does not cap the total size of the fetched value.
   final int? size;
 
   /// Check if the column type is a binary type
@@ -128,24 +140,5 @@ class ColumnType {
   }
 }
 
-/// Extension class for dart [String]
-extension OdbcString on String {
-  static final _unicodeWhitespaceRegExp = RegExp(
-    r'[\u0000\u0020\u00A0\u180E\u200A\u200B\u202F\u205F\u3000\uFEFF\u2800\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u2400]',
-  );
-
-  /// Removes all unicode whitespaces from the string
-  @Deprecated('This method is no longer needed')
-  String removeUnicodeWhitespaces() {
-    return replaceAll(_unicodeWhitespaceRegExp, '');
-  }
-}
-
-///
-enum UtfType {
-  ///
-  utf8,
-
-  ///
-  utf16,
-}
+/// default Buffer size (match OS page size)
+const defaultBufferSize = 4096;

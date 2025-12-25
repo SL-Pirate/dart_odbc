@@ -14,3 +14,6 @@ windows/
 .idea/
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# env
+.env

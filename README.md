@@ -164,7 +164,7 @@ This package has been tested to be working on the following Database Servers
 
 - Simply execute the following command to run the tests with `dart cli`
 
-> $ dart test ./test/integration/*
+> $ dart test
 
 ## Support for other Database Servers
 

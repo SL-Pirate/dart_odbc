@@ -80,3 +80,9 @@
 ## 4.2.0+1
 
 - Implemented better support for working with binary data
+
+## 5.0.0
+
+### Breaking changes
+- Removed deprecated members that were scheduled for removal
+- Updated dependencies to newer major versions

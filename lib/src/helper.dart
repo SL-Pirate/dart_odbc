@@ -127,25 +127,3 @@ class ColumnType {
         type == SQL_LONGVARBINARY;
   }
 }
-
-/// Extension class for dart [String]
-extension OdbcString on String {
-  static final _unicodeWhitespaceRegExp = RegExp(
-    r'[\u0000\u0020\u00A0\u180E\u200A\u200B\u202F\u205F\u3000\uFEFF\u2800\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u2400]',
-  );
-
-  /// Removes all unicode whitespaces from the string
-  @Deprecated('This method is no longer needed')
-  String removeUnicodeWhitespaces() {
-    return replaceAll(_unicodeWhitespaceRegExp, '');
-  }
-}
-
-///
-enum UtfType {
-  ///
-  utf8,
-
-  ///
-  utf16,
-}

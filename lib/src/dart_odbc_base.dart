@@ -18,20 +18,8 @@ class DartOdbc {
   /// Optionally the ODBC version can be specified using the [version] parameter
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  factory DartOdbc({
-    String? dsn,
-    String? pathToDriver,
-    @Deprecated('Is not used anymore') int? version,
-    @Deprecated(
-      'It is not required to use this anymore as the issue has been fixed',
-    )
-    UtfType utfType = UtfType.utf16,
-  }) {
-    return DartOdbc._internal(
-      dsn: dsn,
-      pathToDriver: pathToDriver,
-      version: version,
-    );
+  factory DartOdbc({String? dsn, String? pathToDriver}) {
+    return DartOdbc._internal(dsn: dsn, pathToDriver: pathToDriver);
   }
 
   DartOdbc._internal({String? dsn, String? pathToDriver, int? version})
@@ -468,28 +456,5 @@ class DartOdbc {
     calloc.free(columnCount);
 
     return rows;
-  }
-
-  /// On some platforms with some drivers, the ODBC driver may return
-  /// whitespace characters as unicode characters. This function will remove
-  /// these unicode whitespace characters from the result set.
-  @Deprecated('This method is no longer needed')
-  static List<Map<String, dynamic>> removeWhitespaceUnicodes(
-    List<Map<String, dynamic>> result,
-  ) {
-    return result.map((record) {
-      final sanitizedDict = <String, String>{};
-      record.forEach((key, value) {
-        // Trim all whitespace from keys and values using a regular expression
-        final sanitizedKey = key.replaceAll(RegExp(r'\s+'), '');
-        final cleanedKey = sanitizedKey.removeUnicodeWhitespaces();
-        final sanitizedValue =
-            value.toString().replaceAll(RegExp(r'[\s\u00A0]+'), '');
-        final cleanedValue = sanitizedValue.removeUnicodeWhitespaces();
-
-        sanitizedDict[cleanedKey] = cleanedValue;
-      });
-      return sanitizedDict;
-    }).toList();
   }
 }

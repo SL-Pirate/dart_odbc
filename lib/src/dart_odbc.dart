@@ -74,10 +74,14 @@ abstract interface class IDartOdbc {
   /// The [operationType] parameter is the type of operation that caused the
   /// error.
   /// If [handle] is not provided, the error message will not be descriptive.
+  /// The [beforeThrow] parameter is an optional callback that is executed
+  /// before throwing the exception. This can be used for cleanup or logging.
+  /// Returns the status code if it indicates success.
   int tryOdbc(
     int status, {
     SQLHANDLE? handle,
     int operationType = SQL_HANDLE_STMT,
+    void Function()? beforeThrow,
     ODBCException? onException,
   });
 }

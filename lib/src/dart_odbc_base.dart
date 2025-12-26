@@ -29,17 +29,19 @@ class DartOdbc implements IDartOdbc {
   SQLHDBC _hConn = nullptr;
 
   void _initialize() {
-    final pHEnv = calloc.allocate<SQLHANDLE>(sizeOf<SQLHANDLE>());
+    final pHEnv = calloc<SQLHANDLE>();
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_ENV, nullptr, pHEnv),
       operationType: SQL_HANDLE_ENV,
       handle: pHEnv.value,
       onException: HandleException(),
+      beforeThrow: () {
+        calloc.free(pHEnv);
+      },
     );
     _hEnv = pHEnv.value;
 
-    final pVer = calloc.allocate<SQLINTEGER>(sizeOf<SQLINTEGER>())
-      ..value = SQL_OV_ODBC3;
+    final pVer = calloc<SQLINTEGER>()..value = SQL_OV_ODBC3;
 
     tryOdbc(
       _sql.SQLSetEnvAttr(
@@ -51,6 +53,11 @@ class DartOdbc implements IDartOdbc {
       handle: _hEnv,
       operationType: SQL_HANDLE_ENV,
       onException: HandleException(),
+      beforeThrow: () {
+        calloc
+          ..free(pHEnv)
+          ..free(pVer);
+      },
     );
 
     calloc
@@ -75,12 +82,15 @@ class DartOdbc implements IDartOdbc {
       throw ODBCException('DSN not provided');
     }
     final dsnLocal = _dsn!;
-    final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
+    final pHConn = calloc<SQLHDBC>();
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
       handle: _hEnv,
       operationType: SQL_HANDLE_DBC,
       onException: HandleException(),
+      beforeThrow: () {
+        calloc.free(pHConn);
+      },
     );
     _hConn = pHConn.value;
     final cDsn = dsnLocal.toNativeUtf16().cast<UnsignedShort>();
@@ -99,6 +109,13 @@ class DartOdbc implements IDartOdbc {
       handle: _hConn,
       operationType: SQL_HANDLE_DBC,
       onException: ConnectionException(),
+      beforeThrow: () {
+        calloc
+          ..free(pHConn)
+          ..free(cDsn)
+          ..free(cUsername)
+          ..free(cPassword);
+      },
     );
     calloc
       ..free(pHConn)
@@ -109,40 +126,55 @@ class DartOdbc implements IDartOdbc {
 
   @override
   Future<String> connectWithConnectionString(String connectionString) async {
-    final pHConn = calloc.allocate<SQLHDBC>(sizeOf<SQLHDBC>());
+    final pHConn = calloc<SQLHDBC>();
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
       handle: _hEnv,
       operationType: SQL_HANDLE_DBC,
       onException: HandleException(),
+      beforeThrow: () {
+        calloc.free(pHConn);
+      },
     );
     _hConn = pHConn.value;
 
     final cConnectionString = connectionString.toNativeUtf16();
-    const outChars = 1024;
-    final outConnectionString = calloc<Uint16>(outChars);
-    final outConnectionStringLen = calloc<Short>();
+    final outChars = defaultBufferSize ~/ sizeOf<Uint16>();
+    final pOutConnectionString = calloc<Uint16>(outChars);
+    final pOutConnectionStringLen = calloc<Short>();
 
-    _sql.SQLDriverConnectW(
-      _hConn,
-      nullptr,
-      cConnectionString.cast(),
-      SQL_NTS,
-      outConnectionString.cast(),
-      outChars,
-      outConnectionStringLen,
-      SQL_DRIVER_NOPROMPT,
+    tryOdbc(
+      _sql.SQLDriverConnectW(
+        _hConn,
+        nullptr,
+        cConnectionString.cast(),
+        SQL_NTS,
+        pOutConnectionString.cast(),
+        outChars,
+        pOutConnectionStringLen,
+        SQL_DRIVER_NOPROMPT,
+      ),
+      handle: _hConn,
+      operationType: SQL_HANDLE_DBC,
+      onException: ConnectionException(),
+      beforeThrow: () {
+        calloc
+          ..free(pHConn)
+          ..free(cConnectionString)
+          ..free(pOutConnectionString)
+          ..free(pOutConnectionStringLen);
+      },
     );
 
-    final completedConnectionString = outConnectionString
+    final completedConnectionString = pOutConnectionString
         .cast<Utf16>()
-        .toDartString(length: outConnectionStringLen.value);
+        .toDartString(length: pOutConnectionStringLen.value);
 
     calloc
       ..free(pHConn)
       ..free(cConnectionString)
-      ..free(outConnectionString)
-      ..free(outConnectionStringLen);
+      ..free(pOutConnectionString)
+      ..free(pOutConnectionStringLen);
 
     return completedConnectionString;
   }
@@ -158,11 +190,14 @@ class DartOdbc implements IDartOdbc {
       throw ODBCException('Not connected to the database');
     }
 
-    final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
+    final pHStmt = calloc<SQLHSTMT>();
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
       handle: _hConn,
       onException: HandleException(),
+      beforeThrow: () {
+        calloc.free(pHStmt);
+      },
     );
     final hStmt = pHStmt.value;
 
@@ -187,19 +222,20 @@ class DartOdbc implements IDartOdbc {
       ),
       handle: hStmt,
       onException: FetchException(),
+      beforeThrow: () {
+        calloc
+          ..free(pHStmt)
+          ..free(cCatalog)
+          ..free(cSchema)
+          ..free(cTableName)
+          ..free(cTableType);
+      },
     );
 
     final result = _getResult(hStmt, {});
 
     // Clean up
-    final resetStatus = _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
-
-    if (![SQL_SUCCESS, SQL_SUCCESS_WITH_INFO].contains(resetStatus)) {
-      _log.warning(
-        'Failed to reset parameters after fetching tables. '
-        'Status code: $resetStatus',
-      );
-    }
+    _freeSqlStmtHandle(hStmt);
 
     calloc
       ..free(pHStmt)
@@ -222,11 +258,14 @@ class DartOdbc implements IDartOdbc {
     }
 
     final pointers = <OdbcPointer<dynamic>>[];
-    final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
+    final pHStmt = calloc<SQLHSTMT>();
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
       handle: _hConn,
       onException: HandleException(),
+      beforeThrow: () {
+        calloc.free(pHStmt);
+      },
     );
     final hStmt = pHStmt.value;
     final cQuery = query.toNativeUtf16();
@@ -234,9 +273,15 @@ class DartOdbc implements IDartOdbc {
     // binding sanitized params
     if (params != null) {
       tryOdbc(
-        _sql.SQLPrepareW(hStmt, cQuery.cast(), cQuery.length),
+        _sql.SQLPrepareW(hStmt, cQuery.cast(), SQL_NTS),
         handle: hStmt,
         onException: QueryException(),
+        beforeThrow: () {
+          calloc
+            ..free(cQuery)
+            ..free(pHStmt);
+          _freeSqlStmtHandle(hStmt);
+        },
       );
 
       for (var i = 0; i < params.length; i++) {
@@ -256,6 +301,17 @@ class DartOdbc implements IDartOdbc {
             nullptr,
           ),
           handle: hStmt,
+          beforeThrow: () {
+            calloc
+              ..free(cQuery)
+              ..free(pHStmt);
+            cParam.free();
+            _freeSqlStmtHandle(hStmt);
+
+            for (final p in pointers) {
+              p.free();
+            }
+          },
         );
         pointers.add(cParam);
       }
@@ -265,20 +321,29 @@ class DartOdbc implements IDartOdbc {
       tryOdbc(
         _sql.SQLExecDirectW(hStmt, cQuery.cast(), query.length),
         handle: hStmt,
+        beforeThrow: () {
+          calloc
+            ..free(cQuery)
+            ..free(pHStmt);
+          _freeSqlStmtHandle(hStmt);
+        },
       );
     } else {
-      tryOdbc(_sql.SQLExecute(hStmt), handle: hStmt);
+      tryOdbc(
+        _sql.SQLExecute(hStmt),
+        handle: hStmt,
+        beforeThrow: () {
+          calloc
+            ..free(cQuery)
+            ..free(pHStmt);
+          _freeSqlStmtHandle(hStmt);
+        },
+      );
     }
 
     final result = _getResult(hStmt, columnConfig);
 
-    final resetStatus = _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
-    if (![SQL_SUCCESS, SQL_SUCCESS_WITH_INFO].contains(resetStatus)) {
-      _log.warning(
-        'Failed to reset parameters after query execution. '
-        'Status code: $resetStatus',
-      );
-    }
+    _freeSqlStmtHandle(hStmt);
 
     // free memory
     for (final ptr in pointers) {
@@ -335,6 +400,7 @@ class DartOdbc implements IDartOdbc {
     SQLHANDLE? handle,
     int operationType = SQL_HANDLE_STMT,
     ODBCException? onException,
+    void Function()? beforeThrow,
   }) {
     if (status >= 0) {
       return status;
@@ -344,42 +410,44 @@ class DartOdbc implements IDartOdbc {
     onException.code = status;
 
     if (handle == null || handle == nullptr) {
+      beforeThrow?.call();
       throw onException;
     }
 
-    final sqlState = calloc<Uint16>(6);
-    final nativeErr = calloc<Int>();
-    final msg = calloc<Uint16>(1024);
-    final msgLen = calloc<Short>();
+    final pSqlState = calloc<Uint16>(6);
+    final pNativeErr = calloc<Int>();
+    final pMesg = calloc<Uint16>(1024);
+    final pMsgLen = calloc<Short>();
 
     try {
       final diagStatus = _sql.SQLGetDiagRecW(
         operationType,
         handle,
         1,
-        sqlState.cast(),
-        nativeErr,
-        msg.cast(),
+        pSqlState.cast(),
+        pNativeErr,
+        pMesg.cast(),
         1024,
-        msgLen,
+        pMsgLen,
       );
 
       if (diagStatus >= 0) {
         onException
-          ..sqlState = sqlState.cast<Utf16>().toDartString()
-          ..code = nativeErr.value
-          ..message = msg.cast<Utf16>().toDartString(length: msgLen.value);
+          ..sqlState = pSqlState.cast<Utf16>().toDartString()
+          ..code = pNativeErr.value
+          ..message = pMesg.cast<Utf16>().toDartString(length: pMsgLen.value);
       }
     } on Exception {
       _log.warning('Failed to retrieve ODBC diagnostics.');
     } finally {
       calloc
-        ..free(sqlState)
-        ..free(nativeErr)
-        ..free(msg)
-        ..free(msgLen);
+        ..free(pSqlState)
+        ..free(pNativeErr)
+        ..free(pMesg)
+        ..free(pMsgLen);
     }
 
+    beforeThrow?.call();
     throw onException;
   }
 
@@ -387,29 +455,31 @@ class DartOdbc implements IDartOdbc {
     SQLHSTMT hStmt,
     Map<String, ColumnType> columnConfig,
   ) {
-    final columnCount = calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
+    final pColumnCount = calloc<SQLSMALLINT>();
     tryOdbc(
-      _sql.SQLNumResultCols(hStmt, columnCount),
+      _sql.SQLNumResultCols(hStmt, pColumnCount),
       handle: hStmt,
       onException: FetchException(),
+      beforeThrow: () {
+        calloc.free(pColumnCount);
+      },
     );
 
+    final columnNameCharSize = defaultBufferSize ~/ sizeOf<Uint16>();
     // allocating memory for column names
     // outside the loop to reduce overhead in memory allocation
-    final columnNameLength =
-        calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
-    final columnName =
-        calloc.allocate<Uint16>(defaultBufferSize ~/ sizeOf<Uint16>());
+    final pColumnNameLength = calloc<SQLSMALLINT>();
+    final pColumnName = calloc<Uint16>(columnNameCharSize);
     final columnNames = <String>[];
 
-    for (var i = 1; i <= columnCount.value; i++) {
+    for (var i = 1; i <= pColumnCount.value; i++) {
       tryOdbc(
         _sql.SQLDescribeColW(
           hStmt,
           i,
-          columnName.cast(),
-          defaultBufferSize,
-          columnNameLength,
+          pColumnName.cast(),
+          columnNameCharSize,
+          pColumnNameLength,
           nullptr,
           nullptr,
           nullptr,
@@ -417,23 +487,28 @@ class DartOdbc implements IDartOdbc {
         ),
         handle: hStmt,
         onException: FetchException(),
+        beforeThrow: () {
+          calloc
+            ..free(pColumnName)
+            ..free(pColumnNameLength)
+            ..free(pColumnCount);
+        },
       );
-      final charCodes = columnName.asTypedList(columnNameLength.value).toList()
-        ..removeWhere((e) => e == 0);
-      columnNames.add(
-        String.fromCharCodes(charCodes),
-      );
+      final columnName = pColumnName
+          .cast<Utf16>()
+          .toDartString(length: pColumnNameLength.value);
+      columnNames.add(columnName);
     }
 
     // free memory
     calloc
-      ..free(columnName)
-      ..free(columnNameLength);
+      ..free(pColumnName)
+      ..free(pColumnNameLength);
 
     final rows = <Map<String, dynamic>>[];
 
     // keeping outside the loop to reduce overhead in memory allocation
-    final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
+    final pColumnValueLength = calloc<SQLLEN>();
     final buf = calloc.allocate(defaultBufferSize);
 
     while (true) {
@@ -441,7 +516,7 @@ class DartOdbc implements IDartOdbc {
       if (rc < 0 || rc == SQL_NO_DATA) break;
 
       final row = <String, dynamic>{};
-      for (var i = 1; i <= columnCount.value; i++) {
+      for (var i = 1; i <= pColumnCount.value; i++) {
         final columnType = columnConfig[columnNames[i - 1]];
 
         if (columnType != null && columnType.isBinary()) {
@@ -456,18 +531,24 @@ class DartOdbc implements IDartOdbc {
                 SQL_C_BINARY,
                 buf.cast(),
                 defaultBufferSize,
-                columnValueLength,
+                pColumnValueLength,
               ),
               handle: hStmt,
               onException: FetchException(),
+              beforeThrow: () {
+                calloc
+                  ..free(buf)
+                  ..free(pColumnValueLength)
+                  ..free(pColumnCount);
+              },
             );
 
-            if (columnValueLength.value == SQL_NULL_DATA) {
+            if (pColumnValueLength.value == SQL_NULL_DATA) {
               // null column
               break;
             }
 
-            final returnedBytes = columnValueLength.value;
+            final returnedBytes = pColumnValueLength.value;
             final unitsReturned = returnedBytes == SQL_NO_TOTAL
                 ? defaultBufferSize
                 : (returnedBytes ~/ sizeOf<Uint8>())
@@ -502,18 +583,24 @@ class DartOdbc implements IDartOdbc {
                 SQL_WCHAR,
                 buf.cast(),
                 bufBytes,
-                columnValueLength,
+                pColumnValueLength,
               ),
               handle: hStmt,
               onException: FetchException(),
+              beforeThrow: () {
+                calloc
+                  ..free(buf)
+                  ..free(pColumnValueLength)
+                  ..free(pColumnCount);
+              },
             );
 
-            if (columnValueLength.value == SQL_NULL_DATA) {
+            if (pColumnValueLength.value == SQL_NULL_DATA) {
               // null column
               break;
             }
 
-            final returnedBytes = columnValueLength.value;
+            final returnedBytes = pColumnValueLength.value;
             final maxUnitsInBuffer = unitBuf;
 
             final unitsReturned = returnedBytes == SQL_NO_TOTAL
@@ -546,9 +633,20 @@ class DartOdbc implements IDartOdbc {
     // free memory
     calloc
       ..free(buf)
-      ..free(columnCount)
-      ..free(columnValueLength);
+      ..free(pColumnCount)
+      ..free(pColumnValueLength);
 
     return rows;
+  }
+
+  void _freeSqlStmtHandle(SQLHSTMT hStmt) {
+    final resetStatus = _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
+
+    if (![SQL_SUCCESS, SQL_SUCCESS_WITH_INFO].contains(resetStatus)) {
+      _log.warning(
+        'Failed to reset parameters after fetching tables. '
+        'Status code: $resetStatus',
+      );
+    }
   }
 }

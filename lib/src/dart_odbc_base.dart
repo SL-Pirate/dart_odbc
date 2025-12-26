@@ -287,6 +287,12 @@ class DartOdbc implements IDartOdbc {
       for (var i = 0; i < params.length; i++) {
         final param = params[i];
         final cParam = OdbcConversions.toPointer(param);
+
+        // if the param is a string or binary data, set the length pointer
+        final pStrLen = cParam.actualSize != null
+            ? (calloc<SQLLEN>()..value = cParam.actualSize!)
+            : nullptr;
+
         tryOdbc(
           _sql.SQLBindParameter(
             hStmt,
@@ -294,11 +300,15 @@ class DartOdbc implements IDartOdbc {
             SQL_PARAM_INPUT,
             OdbcConversions.getCtypeFromType(param.runtimeType),
             OdbcConversions.getSqlTypeFromType(param.runtimeType),
-            0,
-            0,
+            OdbcConversions.getColumnSizeForBindParamsFromType(
+              param.runtimeType,
+            ),
+            OdbcConversions.getDecimalDigitsFromType(
+              param.runtimeType,
+            ),
             cParam.ptr,
             cParam.length,
-            nullptr,
+            pStrLen,
           ),
           handle: hStmt,
           beforeThrow: () {

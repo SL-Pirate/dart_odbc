@@ -61,7 +61,7 @@ class OdbcConversions {
     } else if (type == bool) {
       return SQL_BIT;
     } else if (type == DateTime) {
-      return SQL_TYPE_TIMESTAMP;
+      return SQL_TIMESTAMP;
     } else if (type == List) {
       return SQL_BINARY;
     } else if (type == Null) {
@@ -71,8 +71,30 @@ class OdbcConversions {
     }
   }
 
+  /// Function to get the column size from a Dart type
+  /// This is used for binding parameters to the statement
+  static int getColumnSizeForBindParamsFromType(Type type) {
+    if (type == DateTime) {
+      return 27; // Size of SQL_TIMESTAMP_STRUCT
+    }
+
+    return 0;
+  }
+
+  /// Function to get the decimal digits from a Dart type
+  /// This is used for binding parameters to the statement
+  static int getDecimalDigitsFromType(Type type) {
+    if (type == double) {
+      return 15; // Typical precision for double
+    } else if (type == DateTime) {
+      return 6;
+    }
+
+    return 0;
+  }
+
   /// Convert dart type to a pointer
-  static OdbcPointer<dynamic> toPointer(dynamic value) {
+  static OdbcPointer toPointer(dynamic value) {
     if (value is String) {
       final result = value.toNativeUtf16();
       return OdbcPointer<Utf16>(
@@ -81,15 +103,37 @@ class OdbcConversions {
         value: value,
       );
     } else if (value is int) {
-      final result = calloc.allocate<Int>(sizeOf<Int>())..value = value;
+      final result = calloc<Int>()..value = value;
       return OdbcPointer<Int>(result.cast(), sizeOf<Int>(), value: value);
     } else if (value is double) {
-      final result = calloc.allocate<Double>(sizeOf<Double>())..value = value;
+      final result = calloc<Double>()..value = value;
       return OdbcPointer<Double>(result.cast(), sizeOf<Double>(), value: value);
     } else if (value is bool) {
       // Allocate memory for a single byte (bool is typically 1 byte)
-      final result = calloc.allocate<Uint8>(1)..value = value ? 1 : 0;
+      final result = calloc<Uint8>()..value = value ? 1 : 0;
       return OdbcPointer<Uint8>(result.cast(), 1, value: value);
+    } else if (value is DateTime) {
+      final timestamp = calloc<tagTIMESTAMP_STRUCT>();
+      timestamp.ref.year = value.year;
+      timestamp.ref.month = value.month;
+      timestamp.ref.day = value.day;
+      timestamp.ref.hour = value.hour;
+      timestamp.ref.minute = value.minute;
+      timestamp.ref.second = value.second;
+      timestamp.ref.fraction = value.microsecond * 1000; // nanoseconds
+      return OdbcPointer<tagTIMESTAMP_STRUCT>(
+        timestamp.cast(),
+        sizeOf<tagTIMESTAMP_STRUCT>(),
+        value: value,
+      );
+    } else if (value is Uint8List) {
+      final result = calloc<Uint8>(value.length);
+      result.asTypedList(value.length).setAll(0, value);
+      return OdbcPointer<Uint8>(
+        result.cast(),
+        value.length * sizeOf<Uint8>(),
+        value: value,
+      );
     } else {
       throw Exception('Unsupported data type: ${value.runtimeType}');
     }
@@ -116,7 +160,7 @@ class OdbcConversions {
 }
 
 /// A model that will be used to return the response of to pointer method
-class OdbcPointer<T> {
+class OdbcPointer<T extends NativeType> {
   /// constructor
   OdbcPointer(this.ptr, this.length, {this.value});
 
@@ -133,6 +177,23 @@ class OdbcPointer<T> {
 
   /// size of the pointer
   int length;
+
+  /// actual size (eg: for strings, number of characters)
+  /// If the value is a null, returns SQL_NULL_DATA
+  /// If the value is a String or Uint8List, returns the length
+  /// Otherwise, returns null (meaning size is not applicable)
+  int? get actualSize {
+    if (value == null) return SQL_NULL_DATA;
+
+    if (value is String) {
+      return (value as String).length * sizeOf<Uint16>();
+    }
+    if (value is Uint8List) {
+      return (value as Uint8List).length * sizeOf<Uint8>();
+    } else {
+      return null;
+    }
+  }
 
   /// get the dart type of the pointer
   Type get type => T.runtimeType;

@@ -98,3 +98,8 @@
 ## 5.0.1
 
 - Fixed some minor issues flagged by pana test
+
+## 5.1.0
+
+- Added support for DateTime input for sanitized input.
+- Performance and memory safety improvements.

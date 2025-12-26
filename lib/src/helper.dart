@@ -7,7 +7,8 @@ import 'package:ffi/ffi.dart';
 
 /// Discover and load the ODBC driver library based on the provided path or
 /// the operating system's default library name.
-/// If `pathToDriver` is provided, it attempts to load the library from that path.
+/// If `pathToDriver` is provided, 
+/// it attempts to load the library from that path.
 /// Otherwise, it uses the default library names for Linux, Windows, and macOS.
 /// Throws an [ODBCException] if the library cannot be found.
 LibOdbcExt discoverDriver(String? pathToDriver) {
@@ -199,38 +200,12 @@ class OdbcPointer<T extends NativeType> {
   Type get type => T.runtimeType;
 }
 
-/// A model that will be used to configure the column type
-class ColumnType {
-  /// constructor
-  ColumnType({this.type, this.size});
-
-  /// SQL type
-  /// This can be any of the constants defined in the LibOdbc class
-  /// that start with SQL_C.
-  final int? type;
-
-  /// Size (in bytes) of the buffer used when fetching this column.
-  ///
-  /// This controls the chunk size passed to SQLGetData. Larger values may
-  /// reduce the number of driver calls for large columns at the cost of
-  /// increased memory usage.
-  ///
-  /// If null, [defaultBufferSize] is used.
-  ///
-  /// Note: This does not cap the total size of the fetched value.
-  @Deprecated('This will not be used anymore and the buffer size will be '
-      'always be set to defaultBufferSize'
-      ' This is to improve performance'
-      ' when allocating memory for fetching data.')
-  final int? size;
-
-  /// Check if the column type is a binary type
-  bool isBinary() {
-    return type == SQL_BINARY ||
-        type == SQL_VARBINARY ||
-        type == SQL_LONGVARBINARY;
-  }
-}
-
 /// default Buffer size (match OS page size)
 const defaultBufferSize = 4096;
+
+/// Check if the SQL type is a binary type
+bool isSQLTypeBinary(int type) {
+  return type == SQL_BINARY ||
+      type == SQL_VARBINARY ||
+      type == SQL_LONGVARBINARY;
+}

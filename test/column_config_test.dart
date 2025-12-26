@@ -1,4 +1,3 @@
-import 'package:dart_odbc/dart_odbc.dart';
 import 'package:test/test.dart';
 
 import 'test_helper.dart';
@@ -13,10 +12,7 @@ void main() {
   test('columnConfig overrides type and size', () async {
     final result = await helper.query(
       'SELECT data FROM BINARY_TABLE WHERE id = ?',
-      params: [1],
-      columnConfig: {
-        'data': ColumnType(type: SQL_VARBINARY),
-      },
+      params: [2],
     );
 
     expect(result, isNotEmpty);

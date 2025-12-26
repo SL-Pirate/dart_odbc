@@ -232,7 +232,7 @@ class DartOdbc implements IDartOdbc {
       },
     );
 
-    final result = _getResult(hStmt, {});
+    final result = _getResult(hStmt);
 
     // Clean up
     _freeSqlStmtHandle(hStmt);
@@ -251,7 +251,6 @@ class DartOdbc implements IDartOdbc {
   Future<List<Map<String, dynamic>>> execute(
     String query, {
     List<dynamic>? params,
-    Map<String, ColumnType> columnConfig = const {},
   }) async {
     if (_hEnv == nullptr || _hConn == nullptr) {
       throw ODBCException('Not connected to the database');
@@ -351,7 +350,7 @@ class DartOdbc implements IDartOdbc {
       );
     }
 
-    final result = _getResult(hStmt, columnConfig);
+    final result = _getResult(hStmt);
 
     _freeSqlStmtHandle(hStmt);
 
@@ -461,10 +460,7 @@ class DartOdbc implements IDartOdbc {
     throw onException;
   }
 
-  List<Map<String, dynamic>> _getResult(
-    SQLHSTMT hStmt,
-    Map<String, ColumnType> columnConfig,
-  ) {
+  List<Map<String, dynamic>> _getResult(SQLHSTMT hStmt) {
     final pColumnCount = calloc<SQLSMALLINT>();
     tryOdbc(
       _sql.SQLNumResultCols(hStmt, pColumnCount),
@@ -480,7 +476,9 @@ class DartOdbc implements IDartOdbc {
     // outside the loop to reduce overhead in memory allocation
     final pColumnNameLength = calloc<SQLSMALLINT>();
     final pColumnName = calloc<Uint16>(columnNameCharSize);
+    final pDataType = calloc<SQLSMALLINT>();
     final columnNames = <String>[];
+    final columnTypes = <String, int>{};
 
     for (var i = 1; i <= pColumnCount.value; i++) {
       tryOdbc(
@@ -490,7 +488,7 @@ class DartOdbc implements IDartOdbc {
           pColumnName.cast(),
           columnNameCharSize,
           pColumnNameLength,
-          nullptr,
+          pDataType,
           nullptr,
           nullptr,
           nullptr,
@@ -501,6 +499,7 @@ class DartOdbc implements IDartOdbc {
           calloc
             ..free(pColumnName)
             ..free(pColumnNameLength)
+            ..free(pDataType)
             ..free(pColumnCount);
         },
       );
@@ -508,11 +507,13 @@ class DartOdbc implements IDartOdbc {
           .cast<Utf16>()
           .toDartString(length: pColumnNameLength.value);
       columnNames.add(columnName);
+      columnTypes[columnName] = pDataType.value;
     }
 
     // free memory
     calloc
       ..free(pColumnName)
+      ..free(pDataType)
       ..free(pColumnNameLength);
 
     final rows = <Map<String, dynamic>>[];
@@ -527,9 +528,9 @@ class DartOdbc implements IDartOdbc {
 
       final row = <String, dynamic>{};
       for (var i = 1; i <= pColumnCount.value; i++) {
-        final columnType = columnConfig[columnNames[i - 1]];
+        final columnType = columnTypes[columnNames[i - 1]];
 
-        if (columnType != null && columnType.isBinary()) {
+        if (columnType != null && isSQLTypeBinary(columnType)) {
           // incremental read for binary data
           final collected = <int>[];
 

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:dart_odbc/dart_odbc.dart';
 import 'package:open_url/open_url.dart';
 import 'package:test/test.dart';
 
@@ -15,11 +14,11 @@ void main() {
 
   tearDownAll(helper.disconnect);
   tearDownAll(() async {
-      // Give user time to see it
-      await Future<void>.delayed(const Duration(seconds: 10));
+    // Give user time to see it
+    await Future<void>.delayed(const Duration(seconds: 10));
 
-      // Cleanup
-      await imageFile.delete();
+    // Cleanup
+    await imageFile.delete();
   });
 
   test(
@@ -27,9 +26,6 @@ void main() {
     () async {
       final imgData = await helper.query(
         'SELECT DATA FROM BINARY_TABLE WHERE ID = 1',
-        columnConfig: {
-          'DATA': ColumnType(type: SQL_VARBINARY),
-        },
       );
       expect(imgData, isNotEmpty);
       expect(imgData.first['DATA'], isA<Uint8List>());

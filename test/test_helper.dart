@@ -41,13 +41,8 @@ class TestHelper {
   Future<List<Map<String, dynamic>>> query(
     String sql, {
     List<dynamic> params = const [],
-    Map<String, ColumnType>? columnConfig,
   }) {
-    return odbc.execute(
-      sql,
-      params: params,
-      columnConfig: columnConfig ?? {},
-    );
+    return odbc.execute(sql, params: params);
   }
 
   Future<void> disconnect() => odbc.disconnect();

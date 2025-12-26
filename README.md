@@ -8,94 +8,86 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
 
 ## Usage
 
-- Instanciate the ODBC class by providing the path to the odbc driver on the host machine
+- Instanciate the ODBC class by providing the DSN (Data Source Name)
 
 ```dart
-  final odbc = DartOdbc(
-    dsn: '<your_dsn>',
-    pathToDriver: '<path_to_odbc_driver>',
-  );
+final odbc = DartOdbc(dsn: '<your_dsn>');
 ```
 
-### DSN (optional)
+- This should discover the ODBC drver and initialize the internal mechanisms required to communicate with the driver.
+- Alternatively, you can provide the path to the odbc driver when it is not placed in a discoverable location or the library fails to automatically detect the location of the driver. But this is not recommended due to security concerns. Use this only as a fallback option.
+
+```dart
+final odbc = DartOdbc(
+  dsn: '<your_dsn>',
+  pathToDriver: 'path/to/the/odbc/driver',
+);
+```
+
+- It is also recommended that you provide the path to the ODBC driver manager and not the odbc driver itself as the driver manager itself acts as a compatibility layer accross different drivers but theoritically, the vendor issued driver might work as well. Not recommended.
+
+### DSN
 
 The DSN (Data Source Name) is the name you gave when setting up the driver manager.
 For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html)
-If not provided, the connection can only be made via connection string.
+If not provided, the connection will only be limited to connecting via the connection string. For more information see below.
 
 - Connect to the database by providing the DSN (Data Source Name) configured in the ODBC Driver Manager
 
 ```dart
-  await odbc.connect(
-    username: 'db_username',
-    password: 'db_password',
-  );
+await odbc.connect(
+  username: 'db_username',
+  password: 'db_password',
+);
 ```
 
 - Or connect to the database via connection string
 
 ```dart
-  await odbc.connectWithConnectionString(
-    "DRIVER={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)};DBQ=C:\Users\Computer\AppData\Local\Temp\test.xlsx;"
-  );
+await odbc.connectWithConnectionString(
+  "DRIVER={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)};DBQ=C:\Users\Computer\AppData\Local\Temp\test.xlsx;"
+);
 ```
 
 ### Executing SQL queries
 
 ```dart
-  final result = await odbc.execute("SELECT 10");
+final result = await odbc.execute("SELECT 10");
 ```
 
 ### Executing prepared statements
 
-- Prepared statements can be used to prevent `SQL Injection`
+- Prepared statements must be used sanitize user input and prevent `SQL Injection`
 - Example query
 
 ```dart
-  final List<Map<String, dynamic>> result = await odbc.execute(
-    'SELECT * FROM USERS WHERE UID = ?',
-    params: [1],
-  );
-```
-
-### Providing configuration for result set columns
-
-- DartOdbc can automatically decode result sets for most queries.
-- In rare cases, columns with non-text data types (most commonly binary data) may not be decoded correctly using the default configuration.
-- These cases can be handled by explicitly providing a ColumnType for the affected columns using the columnConfig parameter of the execute method.
-- Only columns with decoding issues need to be configured.
-
-```dart
-// Assume a table like this:
-//
-// +-----+--------+----------------------+
-// | UID | NAME   | AVATAR               |
-// +-----+--------+----------------------+
-// | 1   | Alice  | <binary data>        |
-// | 2   | Bob    | <binary data>        |
-// +-----+--------+----------------------+
-//
-// NAME   -> text column (NVARCHAR / VARCHAR)
-// AVATAR -> binary column (VARBINARY / BLOB)
-
-final result = await odbc.execute(
-  'SELECT UID, NAME, AVATAR FROM USERS WHERE UID = ?',
+final List<Map<String, dynamic>> result = await odbc.execute(
+  'SELECT * FROM USERS WHERE UID = ?',
   params: [1],
-
-  /// By default, all columns are fetched as SQL_C_WCHAR.
-  /// Binary columns must be explicitly overridden.
-  columnConfig: {
-    'AVATAR': ColumnType(type: SQL_C_BINARY),
-  },
 );
 ```
 
-- This configuration is typically required only for binary columns.
-Other column types do not require configuration and will ignore it if provided.
-- The result is returned as a `Future<List<Map<String, dynamic>>>`, where each `Map` represents a row.
-- If execution or decoding fails, DartOdbc will throw an ODBCException when possible.
-Incorrect column configuration for binary data may result in memory errors or process termination.
-- Text-based columns are returned as `String` values, while binary columns (for example `VARBINARY` or `BLOB`) are returned as `Uint8List`.
+#### Currently supported data types for parameter binding
+
+Below are currently supported data types for parameter binding. If this does not include a type that you are looking for, please open a feature request.
+
+- `String`
+- `int`
+- `double`
+- `bool`
+- `DateTime`
+- `Uint8List`
+
+### Fetching data
+
+- Currently the library only discriminates between text and binary data types.
+- Binary data types (for example `VARBINARY` or `BINARY`) are returned as `Uint8List`.
+- All other data types will be converted to `String` by design.
+
+- When calling the `execute` method, the result is returned as a `Future<List<Map<String, dynamic>>>`, where each `Map` represents a row.
+- Each key in the `Map` corresponds to a column name, and the associated value is the data for that column in the respective row.
+- If execution or decoding fails, DartOdbc will throw an `ODBCException`.
+- ODBCException will contain a `message`, `sqlState` which is a five character code defined in the ODBC standard and a `nativeError` code provided by the driver.
 
 ### Get Tables
 
@@ -146,7 +138,7 @@ void main() {
 
 - Native `ODBC` methods can be executed by using the `LibOdbc` class
 
-- For more information on the `ODBC` api go to [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc?view=sql-server-ver16)
+- For more information on the `ODBC` api go to [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc)
 
 ## Testing
 
@@ -164,7 +156,7 @@ This package has been tested to be working on the following Database Servers
 #### Getting SQL server up and running
 
 1. Get a working sql server. For this you can use a sql server instance from a managed provider or install it locally or on docker.
-2. For docker setup check out [this guide](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?view=sql-server-ver17&tabs=cli&pivots=cs1-bash)
+2. For docker setup check out [this guide](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?tabs=cli&pivots=cs1-bash)
 
 #### Setting up `unixodbc` and the Microsoft SQL Server ODBC driver
 
@@ -185,6 +177,16 @@ This package has been tested to be working on the following Database Servers
 
 - Although not tested, this plugin should work on any database that provides an `ODBC Driver`.
 - For a comprehensive list of supported database servers checkout `Drivers` section of the official [unixodbc](https://www.unixodbc.org/) site
+
+## Support for mobile (`Android` and `iOS`) platforms
+
+This library is primarily intended for desktop and server-side use.
+
+There are no technical restrictions in the codebase that explicitly prevent it from running on mobile platforms. However, in practice, ODBC drivers are rarely available or supported on Android and iOS, and most database vendors do not provide official ODBC implementations for these environments.
+
+To avoid confusion and false expectations, the package is not listed as supported on mobile platforms. That said, if you are able to obtain a working ODBC driver for Android or iOS, the library should function correctly on those platforms.
+
+The Web platform is not supported. This library depends on dart:ffi and dart:io, which are unavailable in web environments.
 
 ## 💖 Support the Project
 

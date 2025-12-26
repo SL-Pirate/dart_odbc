@@ -21,7 +21,7 @@ abstract interface class IDartOdbc {
   ///
   /// This method is useful for connecting to data sources like Excel files or text files
   /// without having to define a DSN.
-  /// 
+  ///
   /// Returns the completed connection string used for the connection.
   ///
   /// Throws a [ConnectionException] if the connection fails.
@@ -59,7 +59,6 @@ abstract interface class IDartOdbc {
   Future<List<Map<String, dynamic>>> execute(
     String query, {
     List<dynamic>? params,
-    Map<String, ColumnType> columnConfig = const {},
   });
 
   /// Disconnects from the database.

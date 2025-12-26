@@ -99,7 +99,8 @@
 
 - Fixed some minor issues flagged by pana test
 
-## 5.1.0
+## 6.0.0
 
 - Added support for DateTime input for sanitized input.
-- Performance and memory safety improvements.
+- Removed `ColumnConfig`. The data types will now be auto detected.
+- Various Performance and memory safety improvements.

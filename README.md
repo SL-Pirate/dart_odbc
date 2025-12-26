@@ -122,8 +122,7 @@ Finally, don’t forget to disconnect and free resources:
 
 See the runnable examples in:
 
-- `example/`
-- `example_connect_to_file_db/`
+- `example/lib`
 
 ## Logging
 

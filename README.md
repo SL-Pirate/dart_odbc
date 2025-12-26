@@ -60,58 +60,42 @@ If not provided, the connection can only be made via connection string.
 
 ### Providing configuration for result set columns
 
-- The abstraction layer of DartOdbc should be able to handle output for most queries
-- But output for columns with very long column size or uncommon data types could get corrupted due to issues in default memory allocation
-- Thes can be handled by providing the `ColumnType` in the `columnConfig` parameter of the `execute` method on `DartOdbc` class
-- Please refer the following example
+- DartOdbc can automatically decode result sets for most queries.
+- In rare cases, columns with non-text data types (most commonly binary data) may not be decoded correctly using the default configuration.
+- These cases can be handled by explicitly providing a ColumnType for the affected columns using the columnConfig parameter of the execute method.
+- Only columns with decoding issues need to be configured.
 
 ```dart
+// Assume a table like this:
+//
+// +-----+--------+----------------------+
+// | UID | NAME   | AVATAR               |
+// +-----+--------+----------------------+
+// | 1   | Alice  | <binary data>        |
+// | 2   | Bob    | <binary data>        |
+// +-----+--------+----------------------+
+//
+// NAME   -> text column (NVARCHAR / VARCHAR)
+// AVATAR -> binary column (VARBINARY / BLOB)
 
-  // Assume a table like this
-  // +-----+-------+-------------+
-  // | UID | NAME  | DESCRIPTION |
-  // +-----+-------+-------------+
-  // | 1   | Alice |             |
-  // | 2   | Bob   |             |
-  // +-----+-------+-------------+
-  // The name is a column of size 150
-  // The description is a column of size 500
+final result = await odbc.execute(
+  'SELECT UID, NAME, AVATAR FROM USERS WHERE UID = ?',
+  params: [1],
 
-  result = await odbc.execute(
-    'SELECT * FROM USERS WHERE UID = ?',
-    params: [1],
-
-    /// The column config can be provided as this.
-    /// But for most cases this config is not necessary
-    /// This is only needed when the data fetching is not working as expected
-    /// Only the columns with issues need to be provided
-    columnConfig: {
-      'NAME': ColumnType(size: 150),
-      'DESCRIPTION': ColumnType(type: SQL_C_WCHAR, size: 500),
-    },
-  );
-
+  /// By default, all columns are fetched as SQL_C_WCHAR.
+  /// Binary columns must be explicitly overridden.
+  columnConfig: {
+    'AVATAR': ColumnType(type: SQL_C_BINARY),
+  },
+);
 ```
 
-- Result will be a `Future` of `List` of `Map` objects (`Future<List<Map<String, dynamic>>>`) where each Map represents a row. If anything goes wrong an `ODBCException` will be thrown
-
-### Working with binary data
-
-- ODBC supports binary data types like `BINARY` and `VARBINARY`.
-- To work with binary data, you must provide the `ColumnType` for the column in the `columnConfig` parameter of the `execute` method on `DartOdbc` class
-
-```dart
-  result = await odbc.execute(
-    'SELECT * FROM USERS WHERE UID = ?',
-    params: [1],
-    columnConfig: {
-      'BINARY_COLUMN': ColumnType(type: SQL_BINARY, size: 100),
-      'VARBINARY_COLUMN': ColumnType(type: SQL_VARBINARY, size: 200),
-    },
-  );
-```
-
-- The resulting colummn will yield a `Uint8List` object.
+- This configuration is typically required only for binary columns.
+Other column types do not require configuration and will ignore it if provided.
+- The result is returned as a `Future<List<Map<String, dynamic>>>`, where each `Map` represents a row.
+- If execution or decoding fails, DartOdbc will throw an ODBCException when possible.
+Incorrect column configuration for binary data may result in memory errors or process termination.
+- Text-based columns are returned as `String` values, while binary columns (for example `VARBINARY` or `BLOB`) are returned as `Uint8List`.
 
 ### Get Tables
 
@@ -126,6 +110,37 @@ final List<Map<String, String>> tables = await odbc.getTables();
 ```dart
   await odbc.disconnect();
 ```
+
+## Logging
+
+DartOdbc uses the standard [package:logging](https://pub.dev/packages/logging) package for internal diagnostics.
+
+- Logging is disabled by default
+- The library does not print to stdout or stderr
+- Applications can opt in and control how log messages are handled
+- This allows DartOdbc to emit diagnostic information (for example, unexpected return codes during cleanup) without imposing any logging behavior on the application.
+
+### Example: enable logging in an application
+
+```dart
+import 'package:logging/logging.dart';
+
+void main() {
+  Logger.root.level = Level.FINE;
+
+  Logger.root.onRecord.listen((record) {
+    print(
+      '[${record.level.name}] '
+      '${record.loggerName}: '
+      '${record.message}',
+    );
+  });
+
+  // Use DartOdbc normally
+}
+```
+
+- If logging is not enabled by the application, all log messages are silently ignored.
 
 ### Accessing ODBC diver bindings directly
 

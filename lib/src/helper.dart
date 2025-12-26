@@ -84,8 +84,8 @@ class OdbcConversions {
       final result = calloc.allocate<Int>(sizeOf<Int>())..value = value;
       return OdbcPointer<Int>(result.cast(), sizeOf<Int>(), value: value);
     } else if (value is double) {
-      final result = calloc.allocate<Float>(sizeOf<Float>())..value = value;
-      return OdbcPointer<Float>(result.cast(), sizeOf<Float>(), value: value);
+      final result = calloc.allocate<Double>(sizeOf<Double>())..value = value;
+      return OdbcPointer<Double>(result.cast(), sizeOf<Double>(), value: value);
     } else if (value is bool) {
       // Allocate memory for a single byte (bool is typically 1 byte)
       final result = calloc.allocate<Uint8>(1)..value = value ? 1 : 0;

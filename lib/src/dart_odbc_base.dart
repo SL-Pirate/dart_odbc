@@ -222,6 +222,7 @@ class DartOdbc {
     List<dynamic>? params,
     Map<String, ColumnType> columnConfig = const {},
   }) async {
+    final pointers = <OdbcPointer<dynamic>>[];
     final pHStmt = calloc.allocate<SQLHSTMT>(sizeOf<SQLHSTMT>());
     tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
@@ -229,7 +230,6 @@ class DartOdbc {
       onException: HandleException(),
     );
     final hStmt = pHStmt.value;
-    final pointers = <OdbcPointer<dynamic>>[];
     final cQuery = query.toNativeUtf16();
 
     // binding sanitized params
@@ -258,6 +258,7 @@ class DartOdbc {
           ),
           handle: hStmt,
         );
+        pointers.add(cParam);
       }
     }
 
@@ -276,7 +277,9 @@ class DartOdbc {
     for (final ptr in pointers) {
       ptr.free();
     }
-    calloc.free(cQuery);
+    calloc
+      ..free(cQuery)
+      ..free(pHStmt);
 
     return result;
   }

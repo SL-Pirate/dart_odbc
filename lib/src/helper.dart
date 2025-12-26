@@ -96,6 +96,10 @@ class OdbcConversions {
   }
 
   /// Convert a hex string to a Uint8List
+  @Deprecated('This method is no longer in use '
+      'and will be removed in future versions. '
+      'Furthermore, it silently truncates invalid hex input '
+      'instead of throwing an error, making it unreliable for production use.')
   static Uint8List hexToUint8List(String hex) {
     final bytes = <int>[];
     for (var i = 0; i < hex.length; i += 2) {

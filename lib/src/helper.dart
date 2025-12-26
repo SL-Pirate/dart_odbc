@@ -153,6 +153,10 @@ class ColumnType {
   /// If null, [defaultBufferSize] is used.
   ///
   /// Note: This does not cap the total size of the fetched value.
+  @Deprecated('This will not be used anymore and the buffer size will be '
+      'always be set to defaultBufferSize'
+      ' This is to improve performance'
+      ' when allocating memory for fetching data.')
   final int? size;
 
   /// Check if the column type is a binary type

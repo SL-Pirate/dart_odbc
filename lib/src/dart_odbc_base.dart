@@ -356,12 +356,15 @@ class DartOdbc {
       onException: FetchException(),
     );
 
+    // allocating memory for column names
+    // outside the loop to reduce overhead in memory allocation
+    final columnNameLength =
+        calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
+    final columnName =
+        calloc.allocate<Uint16>(defaultBufferSize ~/ sizeOf<Uint16>());
     final columnNames = <String>[];
+
     for (var i = 1; i <= columnCount.value; i++) {
-      final columnNameLength =
-          calloc.allocate<SQLSMALLINT>(sizeOf<SQLSMALLINT>());
-      final columnName =
-          calloc.allocate<Uint16>(defaultBufferSize ~/ sizeOf<Uint16>());
       tryOdbc(
         _sql.SQLDescribeColW(
           hStmt,
@@ -382,17 +385,18 @@ class DartOdbc {
       columnNames.add(
         String.fromCharCodes(charCodes),
       );
-
-      // free memory
-      calloc
-        ..free(columnName)
-        ..free(columnNameLength);
     }
+
+    // free memory
+    calloc
+      ..free(columnName)
+      ..free(columnNameLength);
 
     final rows = <Map<String, dynamic>>[];
 
     // keeping outside the loop to reduce overhead in memory allocation
     final columnValueLength = calloc.allocate<SQLLEN>(sizeOf<SQLLEN>());
+    final buf = calloc.allocate(defaultBufferSize);
 
     while (true) {
       final rc = _sql.SQLFetch(hStmt);
@@ -406,9 +410,6 @@ class DartOdbc {
           // incremental read for binary data
           final collected = <int>[];
 
-          final buf =
-              calloc.allocate<Uint8>(columnType.size ?? defaultBufferSize);
-
           while (true) {
             final status = tryOdbc(
               _sql.SQLGetData(
@@ -416,7 +417,7 @@ class DartOdbc {
                 i,
                 SQL_C_BINARY,
                 buf.cast(),
-                columnType.size ?? defaultBufferSize,
+                defaultBufferSize,
                 columnValueLength,
               ),
               handle: hStmt,
@@ -430,12 +431,12 @@ class DartOdbc {
 
             final returnedBytes = columnValueLength.value;
             final unitsReturned = returnedBytes == SQL_NO_TOTAL
-                ? columnType.size ?? defaultBufferSize
+                ? defaultBufferSize
                 : (returnedBytes ~/ sizeOf<Uint8>())
-                    .clamp(0, columnType.size ?? defaultBufferSize);
+                    .clamp(0, defaultBufferSize);
 
             if (unitsReturned > 0) {
-              collected.addAll(buf.asTypedList(unitsReturned));
+              collected.addAll(buf.cast<Uint8>().asTypedList(unitsReturned));
             }
 
             if (status == SQL_SUCCESS) {
@@ -448,16 +449,11 @@ class DartOdbc {
           } else {
             row[columnNames[i - 1]] = Uint8List.fromList(collected);
           }
-
-          calloc.free(buf);
         } else {
           final collectedUnits = <int>[];
 
           // incremental read for wide char (UTF-16) data
-          final unitBuf =
-              (columnType?.size ?? defaultBufferSize) ~/ sizeOf<Uint16>();
-
-          final buf = calloc.allocate<Uint16>(unitBuf);
+          final unitBuf = defaultBufferSize ~/ sizeOf<Uint16>();
           final bufBytes = unitBuf * sizeOf<Uint16>();
 
           while (true) {
@@ -488,14 +484,14 @@ class DartOdbc {
                     .clamp(0, maxUnitsInBuffer);
 
             if (unitsReturned > 0) {
-              collectedUnits.addAll(buf.asTypedList(unitsReturned));
+              collectedUnits
+                  .addAll(buf.cast<Uint16>().asTypedList(unitsReturned));
             }
 
             if (status == SQL_SUCCESS) {
               break;
             }
           }
-          calloc.free(buf);
 
           if (collectedUnits.isEmpty) {
             row[columnNames[i - 1]] = null;
@@ -512,6 +508,7 @@ class DartOdbc {
     // free memory
     _sql.SQLFreeHandle(SQL_HANDLE_STMT, hStmt);
     calloc
+      ..free(buf)
       ..free(columnCount)
       ..free(columnValueLength);
 

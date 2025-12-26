@@ -121,9 +121,7 @@ extension on DartOdbc {
             SQL_PARAM_INPUT,
             OdbcConversions.getCtypeFromType(param.runtimeType),
             OdbcConversions.getSqlTypeFromType(param.runtimeType),
-            OdbcConversions.getColumnSizeForBindParamsFromType(
-              param.runtimeType,
-            ),
+            0,
             OdbcConversions.getDecimalDigitsFromType(
               param.runtimeType,
             ),

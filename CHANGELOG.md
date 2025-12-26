@@ -104,3 +104,7 @@
 - Added support for `DateTime` input for sanitized input.
 - Removed `ColumnConfig`. The data types will now be auto detected.
 - Various Performance and memory safety improvements.
+
+## 6.0.1
+
+- Removed unnecessary parameter setting for SQLBindParameter Column Size

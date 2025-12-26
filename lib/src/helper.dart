@@ -72,22 +72,10 @@ class OdbcConversions {
     }
   }
 
-  /// Function to get the column size from a Dart type
-  /// This is used for binding parameters to the statement
-  static int getColumnSizeForBindParamsFromType(Type type) {
-    if (type == DateTime) {
-      return sizeOf<tagTIMESTAMP_STRUCT>();
-    }
-
-    return 0;
-  }
-
   /// Function to get the decimal digits from a Dart type
   /// This is used for binding parameters to the statement
   static int getDecimalDigitsFromType(Type type) {
-    if (type == double) {
-      return 15; // Typical precision for double
-    } else if (type == DateTime) {
+    if (type == DateTime) {
       return 6;
     }
 

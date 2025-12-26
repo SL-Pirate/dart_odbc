@@ -8,31 +8,42 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
 
 ## Usage
 
-- Instanciate the ODBC class by providing the DSN (Data Source Name)
+### Getting started
+
+Add the dependency:
+
+```sh
+dart pub add dart_odbc
+```
+
+Import and instantiate `DartOdbc` by providing a DSN (Data Source Name):
 
 ```dart
+import 'package:dart_odbc/dart_odbc.dart';
+
 final odbc = DartOdbc(dsn: '<your_dsn>');
 ```
 
-- This should discover the ODBC drver and initialize the internal mechanisms required to communicate with the driver.
-- Alternatively, you can provide the path to the odbc driver when it is not placed in a discoverable location or the library fails to automatically detect the location of the driver. But this is not recommended due to security concerns. Use this only as a fallback option.
+This should discover and load the ODBC driver manager and initialize the internal mechanisms required to communicate with it.
+
+Alternatively, you can provide the path to the driver manager library when it is not placed in a discoverable location or auto-detection fails. This is not recommended due to security concerns; use only as a fallback.
 
 ```dart
 final odbc = DartOdbc(
   dsn: '<your_dsn>',
-  pathToDriver: 'path/to/the/odbc/driver',
+  pathToDriver: '/path/to/odbc/driver/manager',
 );
 ```
 
-- It is also recommended that you provide the path to the ODBC driver manager and not the odbc driver itself as the driver manager itself acts as a compatibility layer accross different drivers but theoritically, the vendor issued driver might work as well. Not recommended.
+It is generally preferable to provide the path to the ODBC driver manager (for example, unixODBC) rather than a vendor-issued driver library. The driver manager acts as a compatibility layer across drivers; a vendor driver may work but is not recommended.
 
 ### DSN
 
 The DSN (Data Source Name) is the name you gave when setting up the driver manager.
-For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html)
-If not provided, the connection will only be limited to connecting via the connection string. For more information see below.
+For more information, visit this page from the [MySQL Documentation](https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-driver-manager.html).
+If not provided, the connection will be limited to connecting via a connection string. For more information, see below.
 
-- Connect to the database by providing the DSN (Data Source Name) configured in the ODBC Driver Manager
+Connect to the database using the DSN configured in the ODBC driver manager:
 
 ```dart
 await odbc.connect(
@@ -41,11 +52,12 @@ await odbc.connect(
 );
 ```
 
-- Or connect to the database via connection string
+Or connect via a connection string:
 
 ```dart
 await odbc.connectWithConnectionString(
-  "DRIVER={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)};DBQ=C:\Users\Computer\AppData\Local\Temp\test.xlsx;"
+  r'DRIVER={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)};'
+  r'DBQ=C:\Users\Computer\AppData\Local\Temp\test.xlsx;'
 );
 ```
 
@@ -57,8 +69,9 @@ final result = await odbc.execute("SELECT 10");
 
 ### Executing prepared statements
 
-- Prepared statements must be used sanitize user input and prevent `SQL Injection`
-- Example query
+Prepared statements should be used to sanitize user input and prevent SQL injection.
+
+Example:
 
 ```dart
 final List<Map<String, dynamic>> result = await odbc.execute(
@@ -80,14 +93,16 @@ Below are currently supported data types for parameter binding. If this does not
 
 ### Fetching data
 
-- Currently the library only discriminates between text and binary data types.
-- Binary data types (for example `VARBINARY` or `BINARY`) are returned as `Uint8List`.
-- All other data types will be converted to `String` by design.
+Currently the library only discriminates between text and binary data types:
 
-- When calling the `execute` method, the result is returned as a `Future<List<Map<String, dynamic>>>`, where each `Map` represents a row.
-- Each key in the `Map` corresponds to a column name, and the associated value is the data for that column in the respective row.
-- If execution or decoding fails, DartOdbc will throw an `ODBCException`.
-- ODBCException will contain a `message`, `sqlState` which is a five character code defined in the ODBC standard and a `nativeError` code provided by the driver.
+- Binary data types (for example `VARBINARY` or `BINARY`) are returned as `Uint8List`.
+- All other data types are converted to `String` by design.
+
+When calling `execute`, the result is a `Future<List<Map<String, dynamic>>>`, where each `Map` represents a row.
+
+- Each key in the `Map` corresponds to a column name.
+- If execution or decoding fails, DartOdbc throws an `ODBCException`.
+- `ODBCException` includes `message`, `sqlState` (a five-character ODBC standard code), and a `nativeError` code from the driver.
 
 ### Get Tables
 
@@ -97,11 +112,18 @@ final List<Map<String, String>> tables = await odbc.getTables();
 
 ### Disconnecting from the database
 
-- Finally, don't forget to `disconnect` from the database and free resources.
+Finally, don’t forget to disconnect and free resources:
 
 ```dart
   await odbc.disconnect();
 ```
+
+### Examples
+
+See the runnable examples in:
+
+- `example/`
+- `example_connect_to_file_db/`
 
 ## Logging
 
@@ -134,11 +156,11 @@ void main() {
 
 - If logging is not enabled by the application, all log messages are silently ignored.
 
-### Accessing ODBC diver bindings directly
+### Accessing ODBC driver bindings directly
 
-- Native `ODBC` methods can be executed by using the `LibOdbc` class
+Native ODBC methods can be executed via the `LibOdbc` class.
 
-- For more information on the `ODBC` api go to [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc)
+- For more information on the ODBC API, see the [Microsoft ODBC Documentation](https://learn.microsoft.com/en-us/sql/odbc/microsoft-open-database-connectivity-odbc)
 
 ## Testing
 
@@ -146,16 +168,17 @@ void main() {
 
 This package has been tested to be working on the following Database Servers
 
-- Microsoft SQL Sever
+- Microsoft SQL Server
 - Oracle
+- MariaDB / MySQL
 
 ### Local testing
 
-- This gives an overview on how you can setup the environment for testing with SQL Server on linux. For windows or mac, please check out the official documentation from Microsoft mentioned above.
+This gives an overview of how you can set up the environment for testing with SQL Server on Linux. For Windows or macOS, please check out the official documentation from Microsoft mentioned above.
 
 #### Getting SQL server up and running
 
-1. Get a working sql server. For this you can use a sql server instance from a managed provider or install it locally or on docker.
+1. Get a working SQL Server. For this you can use a SQL Server instance from a managed provider or install it locally or on Docker.
 2. For docker setup check out [this guide](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?tabs=cli&pivots=cs1-bash)
 
 #### Setting up `unixodbc` and the Microsoft SQL Server ODBC driver
@@ -175,7 +198,7 @@ This package has been tested to be working on the following Database Servers
 
 ## Support for other Database Servers
 
-- Although not tested, this plugin should work on any database that provides an `ODBC Driver`.
+- Although not tested, this package should work on any database that provides an `ODBC Driver`.
 - For a comprehensive list of supported database servers checkout `Drivers` section of the official [unixodbc](https://www.unixodbc.org/) site
 
 ## Support for mobile (`Android` and `iOS`) platforms
@@ -186,7 +209,7 @@ There are no technical restrictions in the codebase that explicitly prevent it f
 
 To avoid confusion and false expectations, the package is not listed as supported on mobile platforms. That said, if you are able to obtain a working ODBC driver for Android or iOS, the library should function correctly on those platforms.
 
-The Web platform is not supported. This library depends on dart:ffi and dart:io, which are unavailable in web environments.
+The Web platform is not supported. This library depends on `dart:ffi` and `dart:io`, which are unavailable in web environments.
 
 ## 💖 Support the Project
 

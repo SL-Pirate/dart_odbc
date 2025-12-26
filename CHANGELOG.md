@@ -101,6 +101,6 @@
 
 ## 6.0.0
 
-- Added support for DateTime input for sanitized input.
+- Added support for `DateTime` input for sanitized input.
 - Removed `ColumnConfig`. The data types will now be auto detected.
 - Various Performance and memory safety improvements.

@@ -7,7 +7,7 @@ import 'package:ffi/ffi.dart';
 
 /// Discover and load the ODBC driver library based on the provided path or
 /// the operating system's default library name.
-/// If `pathToDriver` is provided, 
+/// If `pathToDriver` is provided,
 /// it attempts to load the library from that path.
 /// Otherwise, it uses the default library names for Linux, Windows, and macOS.
 /// Throws an [ODBCException] if the library cannot be found.
@@ -76,7 +76,7 @@ class OdbcConversions {
   /// This is used for binding parameters to the statement
   static int getColumnSizeForBindParamsFromType(Type type) {
     if (type == DateTime) {
-      return 27; // Size of SQL_TIMESTAMP_STRUCT
+      return sizeOf<tagTIMESTAMP_STRUCT>();
     }
 
     return 0;

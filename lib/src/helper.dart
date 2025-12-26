@@ -1,7 +1,30 @@
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
+import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
+
+/// Discover and load the ODBC driver library based on the provided path or
+/// the operating system's default library name.
+/// If `pathToDriver` is provided, it attempts to load the library from that path.
+/// Otherwise, it uses the default library names for Linux, Windows, and macOS.
+/// Throws an [ODBCException] if the library cannot be found.
+LibOdbcExt discoverDriver(String? pathToDriver) {
+  if (pathToDriver != null) {
+    return LibOdbcExt(DynamicLibrary.open(pathToDriver));
+  } else {
+    if (Platform.isLinux) {
+      return LibOdbcExt(DynamicLibrary.open('libodbc.so'));
+    } else if (Platform.isWindows) {
+      return LibOdbcExt(DynamicLibrary.open('odbc32.dll'));
+    } else if (Platform.isMacOS) {
+      return LibOdbcExt(DynamicLibrary.open('libodbc.dylib'));
+    }
+
+    throw ODBCException('ODBC driver not found');
+  }
+}
 
 /// This class contains the conversion techniques required by odbc
 /// to interact with the native code via ffi layer

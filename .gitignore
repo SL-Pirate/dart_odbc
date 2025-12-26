@@ -20,3 +20,6 @@ windows/
 
 # temporary file created by tests
 test.png
+
+# temporary files
+SECURITY_REVIEW.md

@@ -2,10 +2,8 @@
 // ignore_for_file: lines_longer_than_80_chars
 
 import 'dart:ffi';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
-import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
 
 /// DartOdbc class
@@ -19,37 +17,18 @@ class DartOdbc {
   /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  factory DartOdbc({String? dsn, String? pathToDriver}) {
-    return DartOdbc._internal(dsn: dsn, pathToDriver: pathToDriver);
+  DartOdbc({String? dsn, String? pathToDriver})
+      : __sql = discoverDriver(pathToDriver),
+        _dsn = dsn {
+    _initialize();
   }
 
-  DartOdbc._internal({String? dsn, String? pathToDriver, int? version})
-      : _dsn = dsn {
-    if (pathToDriver != null) {
-      __sql = LibOdbcExt(DynamicLibrary.open(pathToDriver));
-    } else {
-      if (Platform.isLinux) {
-        __sql = LibOdbcExt(DynamicLibrary.open('libodbc.so'));
-      } else if (Platform.isWindows) {
-        __sql = LibOdbcExt(DynamicLibrary.open('odbc32.dll'));
-      } else if (Platform.isMacOS) {
-        __sql = LibOdbcExt(DynamicLibrary.open('libodbc.dylib'));
-      }
-
-      if (__sql == null) {
-        throw ODBCException('ODBC driver not found');
-      }
-    }
-
-    _initialize(version: version);
-  }
-
-  LibOdbc? __sql;
+  final LibOdbc? __sql;
   final String? _dsn;
   SQLHANDLE _hEnv = nullptr;
   SQLHDBC _hConn = nullptr;
 
-  void _initialize({int? version}) {
+  void _initialize() {
     final sqlNullHandle = calloc.allocate<Int>(sizeOf<Int>());
     final pHEnv = calloc.allocate<SQLHANDLE>(sizeOf<SQLHANDLE>());
     tryOdbc(

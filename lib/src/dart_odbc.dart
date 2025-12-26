@@ -21,9 +21,11 @@ abstract interface class IDartOdbc {
   ///
   /// This method is useful for connecting to data sources like Excel files or text files
   /// without having to define a DSN.
+  /// 
+  /// Returns the completed connection string used for the connection.
   ///
   /// Throws a [ConnectionException] if the connection fails.
-  Future<void> connectWithConnectionString(String connectionString);
+  Future<String> connectWithConnectionString(String connectionString);
 
   /// Retrieves a list of tables from the connected database.
   ///

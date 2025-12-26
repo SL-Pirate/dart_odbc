@@ -34,8 +34,8 @@ class TestHelper {
     }
   }
 
-  Future<void> connectWithConnectionString(String connectionString) async {
-    await odbc.connectWithConnectionString(connectionString);
+  Future<String> connectWithConnectionString(String connectionString) {
+    return odbc.connectWithConnectionString(connectionString);
   }
 
   Future<List<Map<String, dynamic>>> query(

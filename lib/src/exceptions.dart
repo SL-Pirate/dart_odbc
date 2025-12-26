@@ -9,11 +9,18 @@ class ODBCException implements Exception {
   /// Error code returned from the ODBC driver
   int? code;
 
+  /// SQL State returned from the ODBC driver
+  String? sqlState;
+
   @override
   String toString() {
     var txt = message;
+
+    if (sqlState != null) {
+      txt += '\nSQLState: $sqlState';
+    }
     if (code != null) {
-      txt += '\nErrorCode: $code';
+      txt += '\nNativeError: $code';
     }
 
     return txt;

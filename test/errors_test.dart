@@ -10,6 +10,13 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('invalid SQL throws', () async {
+    // try {
+    //   final result = await helper.query('SELECT * FROM DOES_NOT_EXIST');
+    //   print(result);
+    // } catch (e) {
+    //   print('Caught exception: $e');
+    // }
+
     expect(
       () => helper.query('SELECT * FROM DOES_NOT_EXIST'),
       throwsA(isA<Exception>()),

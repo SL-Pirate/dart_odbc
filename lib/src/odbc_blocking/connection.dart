@@ -1,6 +1,6 @@
-part of './base.dart';
+part of 'base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   Future<void> _connect({
     required String username,
     required String password,

@@ -6,7 +6,7 @@ import 'package:dart_odbc/src/worker/message.dart';
 import 'package:logging/logging.dart';
 
 /// RPC style ODBC Isolate Client used for non-blocking ODBC operations.
-/// Note that each instance of this class 
+/// Note that each instance of this class
 /// manages its own isolate and ODBC connection.
 class OdbcIsolateClient extends IsolateClient {
   /// Constructor for [OdbcIsolateClient].
@@ -75,7 +75,7 @@ class OdbcIsolateClient extends IsolateClient {
         }
         final dsn = message.arguments['dsn'] as String?;
         final pathToDriver = message.arguments['pathToDriver'] as String?;
-        __odbc = DartOdbc.blocking(dsn: dsn, pathToDriver: pathToDriver);
+        __odbc = DartOdbcBlockingClient(dsn: dsn, pathToDriver: pathToDriver);
         return ResponsePayload();
       case OdbcCommand.connect:
         await _odbc.connect(

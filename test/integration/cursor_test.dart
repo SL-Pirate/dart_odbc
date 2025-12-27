@@ -1,5 +1,4 @@
 import 'package:dart_odbc/dart_odbc.dart';
-import 'package:dart_odbc/src/non_blocking/base.dart';
 import 'package:test/test.dart';
 
 import '../test_helper.dart';
@@ -50,7 +49,7 @@ void main() {
   test('multiple non-blocking clients can run cursors concurrently', () async {
     final clients = List.generate(
       3,
-      (_) => DartOdbcNonBlocking(dsn: helper.dsn),
+      (_) => DartOdbc(dsn: helper.dsn),
     );
 
     try {

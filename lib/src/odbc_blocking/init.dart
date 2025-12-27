@@ -1,6 +1,6 @@
-part of './base.dart';
+part of 'base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   void _initialize() {
     final pHEnv = calloc<SQLHANDLE>();
     _tryOdbc(

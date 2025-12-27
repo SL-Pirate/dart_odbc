@@ -1,6 +1,6 @@
 part of '../base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   Future<List<Map<String, dynamic>>> _getTables({
     String? tableName,
     String? catalog,

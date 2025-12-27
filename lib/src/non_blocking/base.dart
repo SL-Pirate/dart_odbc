@@ -5,9 +5,9 @@ import 'package:dart_odbc/src/worker/message.dart';
 import 'package:logging/logging.dart';
 
 /// Non-blocking ODBC client implementation.
-class DartOdbcNonBlocking implements IDartOdbc {
-  /// Constructor for [DartOdbcNonBlocking].
-  DartOdbcNonBlocking({this.dsn, this.pathToDriver});
+class DartOdbc implements IDartOdbc {
+  /// Constructor for [DartOdbc].
+  DartOdbc({this.dsn, this.pathToDriver});
 
   /// Data Source Name.
   final String? dsn;
@@ -124,7 +124,10 @@ class DartOdbcNonBlocking implements IDartOdbc {
   }
 
   @override
-  Future<OdbcCursor> executeCursor(String query, {List<dynamic>? params}) async {
+  Future<OdbcCursor> executeCursor(
+    String query, {
+    List<dynamic>? params,
+  }) async {
     if (_isolateClient == null) {
       throw ODBCException('Not connected to any database.');
     }

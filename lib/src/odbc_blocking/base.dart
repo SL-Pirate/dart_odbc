@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
-import 'package:dart_odbc/src/non_blocking/base.dart';
 import 'package:ffi/ffi.dart';
 import 'package:logging/logging.dart';
 
@@ -15,7 +14,7 @@ part 'execute/get_tables.dart';
 
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
-class DartOdbc implements IDartOdbc {
+class DartOdbcBlockingClient implements IDartOdbc {
   /// DartOdbc constructor
   /// This constructor will initialize the ODBC environment and connection.
   /// The [pathToDriver] parameter is the path to the ODBC driver (optional).
@@ -25,25 +24,11 @@ class DartOdbc implements IDartOdbc {
   /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  DartOdbc({String? dsn, String? pathToDriver})
+  DartOdbcBlockingClient({String? dsn, String? pathToDriver})
       : __sql = discoverDriver(pathToDriver),
         _dsn = dsn {
     _initialize();
   }
-
-  DartOdbc._(String? dsn, String? pathToDriver)
-      : __sql = discoverDriver(pathToDriver),
-        _dsn = dsn {
-    _initialize();
-  }
-
-  /// Creates a blocking [IDartOdbc] instance.
-  static IDartOdbc blocking({String? dsn, String? pathToDriver}) =>
-      DartOdbc._(dsn, pathToDriver);
-
-  /// Creates a non-blocking [IDartOdbc] instance.
-  static IDartOdbc nonBlocking({String? dsn, String? pathToDriver}) =>
-      DartOdbcNonBlocking(dsn: dsn, pathToDriver: pathToDriver);
 
   final LibOdbc? __sql;
   final String? _dsn;

@@ -25,8 +25,8 @@ void main() {
 
   setUpAll(() {
     env = DotEnv()..load(['.env']);
-    helper = TestHelper(DartOdbc.nonBlocking(dsn: env['DSN']));
-    connStrHelper = TestHelper(DartOdbc.nonBlocking());
+    helper = TestHelper(DartOdbc(dsn: env['DSN']));
+    connStrHelper = TestHelper(DartOdbc());
   });
 
   tearDownAll(() async {

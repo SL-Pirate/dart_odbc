@@ -5,9 +5,9 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 
 class TestHelper {
-  TestHelper([IDartOdbc? nonBlockingOdbc]) {
-    if (nonBlockingOdbc != null) {
-      this.odbc = nonBlockingOdbc;
+  TestHelper([IDartOdbc? odbc]) {
+    if (odbc != null) {
+      this.odbc = odbc;
     }
   }
 
@@ -22,7 +22,7 @@ class TestHelper {
 
   Future<void> initialize() async {
     env = DotEnv()..load(['.env']);
-    odbc = DartOdbc.nonBlocking(dsn: env['DSN']);
+    odbc = DartOdbc(dsn: env['DSN']);
     await connect(
       username: env['USERNAME']!,
       password: env['PASSWORD']!,

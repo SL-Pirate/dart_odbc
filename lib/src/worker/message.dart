@@ -4,15 +4,17 @@ class WorkerMessage {
   WorkerMessage({required this.id, required this.type, required this.payload});
 
   /// Creates a new [WorkerMessage] from a map.
-  WorkerMessage.fromMap(Map<String, dynamic> map, {int? id})
-      : id = id ?? map['id'] as int? ?? 0,
-        type = WorkerMessageType.values
-            .firstWhere((e) => e.name == map['type'] as String),
-        payload = WorkerMessagePayload.fromMap(
-          WorkerMessageType.values
-              .firstWhere((e) => e.name == map['type'] as String),
-          Map<String, dynamic>.from(map['payload'] as Map),
-        );
+  factory WorkerMessage.fromMap(Map<String, dynamic> map, {int? id}) {
+    final messageType = WorkerMessageType.values.byName(map['type'] as String);
+    return WorkerMessage(
+      id: id ?? map['id'] as int? ?? 0,
+      type: messageType,
+      payload: WorkerMessagePayload.fromMap(
+        messageType,
+        Map<String, dynamic>.from(map['payload'] as Map),
+      ),
+    );
+  }
 
   /// Creates a [WorkerMessage] from a map.
   final int id;

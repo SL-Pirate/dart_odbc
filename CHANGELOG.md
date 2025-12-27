@@ -112,3 +112,8 @@
 ## 6.1.0
 
 - Implemented streaming support for query results. Now `DartOdbc.executeCursor` can be used to stream large result sets without loading everything into memory at once.
+
+## 6.2.0
+
+- Implemented non-blocking ODBC operations using isolates.
+- Replaced the previous blocking ODBC implementation with a new non-blocking version as the default.

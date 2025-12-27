@@ -1,5 +1,5 @@
 import 'package:dart_odbc/dart_odbc.dart';
-import 'package:dart_odbc/src/non_blocking/worker.dart';
+import 'package:dart_odbc/src/odbc_non_blocking/worker.dart';
 import 'package:dart_odbc/src/worker/client.dart';
 import 'package:dart_odbc/src/worker/message.dart';
 import 'package:logging/logging.dart';
@@ -197,7 +197,10 @@ class DartOdbc implements IDartOdbc {
     void Function()? beforeThrow,
     ODBCException? onException,
   }) {
-    throw UnsupportedError('tryOdbc is not supported in non-blocking mode.');
+    _log.warning(
+      'tryOdbc is deprecated and not supported in non-blocking mode.',
+    );
+    return status;
   }
 
   void _logStackTrace(StackTrace? stackTrace) {

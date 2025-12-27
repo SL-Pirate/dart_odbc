@@ -231,13 +231,17 @@ class _IndexedOdbcCursor implements OdbcCursor {
   final _log = Logger('_IndexedOdbcCursor');
 
   @override
-  Future<void> close() {
-    return client.request(
-      RequestPayload(
-        OdbcCommand.cursorClose.name,
-        {'cursorId': cursorId},
-      ),
-    );
+  Future<void> close() async {
+    try {
+      await client.request(
+        RequestPayload(
+          OdbcCommand.cursorClose.name,
+          {'cursorId': cursorId},
+        ),
+      );
+    } on Object catch (e, st) {
+      _log.warning('Error closing cursor with ID $cursorId', e, st);
+    }
   }
 
   @override

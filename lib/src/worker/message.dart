@@ -16,7 +16,7 @@ class WorkerMessage {
     );
   }
 
-  /// Creates a [WorkerMessage] from a map.
+  /// The ID of the message.
   final int id;
 
   /// Defines the type of the message.

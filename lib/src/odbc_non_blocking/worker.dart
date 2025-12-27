@@ -12,10 +12,12 @@ class OdbcIsolateClient extends IsolateClient {
   /// Constructor for [OdbcIsolateClient].
   OdbcIsolateClient({this.dsn, this.pathToDriver});
 
-  /// Shared. But strings are copiable and immutable
+  /// Only used during isolate initialization
+  /// which is outside the isolate
   final String? dsn;
 
-  /// Shared. But strings are copiable and immutable
+  /// Only used during isolate initialization
+  /// which is outside the isolate
   final String? pathToDriver;
 
   /// THIS IS THE ONLY SHARED STATE INSIDE THE ISOLATE
@@ -77,19 +79,24 @@ class OdbcIsolateClient extends IsolateClient {
         final pathToDriver = message.arguments['pathToDriver'] as String?;
         __odbc = DartOdbcBlockingClient(dsn: dsn, pathToDriver: pathToDriver);
         return ResponsePayload();
+
       case OdbcCommand.connect:
         await _odbc.connect(
           username: message.arguments['username'] as String,
           password: message.arguments['password'] as String,
         );
+        await _clearCursors(); // for sanity
         return ResponsePayload();
+
       case OdbcCommand.connectWithConnectionString:
         final connectionString =
             message.arguments['connectionString'] as String;
         final result = await _odbc.connectWithConnectionString(
           connectionString,
         );
+        await _clearCursors(); // for sanity
         return ResponsePayload(result);
+
       case OdbcCommand.getTables:
         final result = await _odbc.getTables(
           tableName: message.arguments['tableName'] as String?,
@@ -98,17 +105,20 @@ class OdbcIsolateClient extends IsolateClient {
           tableType: message.arguments['tableType'] as String?,
         );
         return ResponsePayload(result);
+
       case OdbcCommand.execute:
         final result = await _odbc.execute(
           message.arguments['query'] as String,
           params: message.arguments['params'] as List<dynamic>?,
         );
         return ResponsePayload(result);
+
       case OdbcCommand.executeCursor:
         return _executeCursor(
           message.arguments['query'] as String,
           message.arguments['params'] as List<dynamic>?,
         );
+
       case OdbcCommand.cursorNext:
         final cursorId = message.arguments['cursorId'] as int;
         final cursor = _cursors[cursorId];
@@ -117,6 +127,7 @@ class OdbcIsolateClient extends IsolateClient {
         }
         final result = await cursor.next();
         return ResponsePayload(result.toMap());
+
       case OdbcCommand.cursorClose:
         final cursorId = message.arguments['cursorId'] as int;
         final cursor = _cursors.remove(cursorId);
@@ -126,6 +137,7 @@ class OdbcIsolateClient extends IsolateClient {
           await cursor.close();
         }
         return ResponsePayload();
+
       case OdbcCommand.disconnect:
         if (__odbc != null) {
           await _clearCursors();
@@ -178,7 +190,7 @@ class OdbcIsolateClient extends IsolateClient {
   }
 }
 
-///
+/// Commands supported by the ODBC isolate.
 enum OdbcCommand {
   /// To be used internally to create the ODBC instance inside the isolate
   _create,

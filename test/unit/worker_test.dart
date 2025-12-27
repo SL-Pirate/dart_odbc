@@ -88,7 +88,6 @@ void main() {
         fail('Received error payload: $res2');
       }
 
-      // expect(res1['result'], equals(3));
       expect((res1 as ResponsePayload).data, equals(3));
       expect((res2 as ResponsePayload).data, equals(30));
     });

@@ -124,8 +124,31 @@ class DartOdbcNonBlocking implements IDartOdbc {
   }
 
   @override
-  Future<OdbcCursor> executeCursor(String query, {List<dynamic>? params}) {
-    throw UnsupportedError('Cursors are not supported in non-blocking mode.');
+  Future<OdbcCursor> executeCursor(String query, {List<dynamic>? params}) async {
+    if (_isolateClient == null) {
+      throw ODBCException('Not connected to any database.');
+    }
+
+    final response = await _isolateClient!.request(
+      RequestPayload(
+        OdbcCommand.executeCursor.name,
+        {
+          'query': query,
+          'params': params,
+        },
+      ),
+    );
+
+    if (response is ErrorPayload) {
+      _logStackTrace(response.stackTrace);
+      throw ODBCException('Error executing cursor: ${response.data}');
+    }
+
+    final cursorId = (response as ResponsePayload).data as int;
+    return _IndexedOdbcCursor(
+      client: _isolateClient!,
+      cursorId: cursorId,
+    );
   }
 
   @override
@@ -160,6 +183,10 @@ class DartOdbcNonBlocking implements IDartOdbc {
   }
 
   @override
+  @Deprecated(
+    'tryOdbc exposes low-level synchronous ODBC semantics and will be removed '
+    'in a future release. It is not supported in non-blocking mode.',
+  )
   int tryOdbc(
     int status, {
     SQLHANDLE? handle,
@@ -186,5 +213,49 @@ class DartOdbcNonBlocking implements IDartOdbc {
     return (response.data as List)
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
+  }
+}
+
+class _IndexedOdbcCursor implements OdbcCursor {
+  _IndexedOdbcCursor({required this.client, required this.cursorId});
+
+  final IsolateClient client;
+  final int cursorId;
+
+  final _log = Logger('_IndexedOdbcCursor');
+
+  @override
+  Future<void> close() {
+    return client.request(
+      RequestPayload(
+        OdbcCommand.cursorClose.name,
+        {'cursorId': cursorId},
+      ),
+    );
+  }
+
+  @override
+  Future<CursorResult> next() async {
+    final result = await client.request(
+      RequestPayload(
+        OdbcCommand.cursorNext.name,
+        {'cursorId': cursorId},
+      ),
+    );
+
+    if (result is ErrorPayload) {
+      _log.severe(
+        null,
+        null,
+        result.stackTrace,
+      );
+      throw ODBCException('Error fetching next cursor item: ${result.data}');
+    }
+
+    return CursorResult.fromMap(
+      Map<String, dynamic>.from(
+        (result as ResponsePayload).data as Map,
+      ),
+    );
   }
 }

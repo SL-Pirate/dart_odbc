@@ -93,7 +93,7 @@ class RequestPayload extends WorkerMessagePayload {
 /// Defines a response message payload.
 class ResponsePayload extends WorkerMessagePayload {
   /// Creates a new [ResponsePayload].
-  ResponsePayload(this.data);
+  ResponsePayload([this.data]);
 
   /// The data of the response.
   final dynamic data;

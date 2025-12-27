@@ -5,23 +5,24 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 
 class TestHelper {
-  TestHelper([(IDartOdbc blocking, IDartOdbc nonBlocking)? drivers]) {
-    if (drivers != null) {
-      final (item1, item2) = drivers;
-
-      blockingOdbc = item1;
-      nonBlockingOdbc = item2;
+  TestHelper([IDartOdbc? nonBlockingOdbc]) {
+    if (nonBlockingOdbc != null) {
+      this.odbc = nonBlockingOdbc;
     }
   }
 
-  late IDartOdbc blockingOdbc;
-  late IDartOdbc nonBlockingOdbc;
+  late IDartOdbc odbc;
   late final DotEnv env;
+
+  String? get dsn => env['DSN'];
+
+  String get username => env['USERNAME']!;
+
+  String get password => env['PASSWORD']!;
 
   Future<void> initialize() async {
     env = DotEnv()..load(['.env']);
-    blockingOdbc = DartOdbc.blocking(dsn: env['DSN']);
-    nonBlockingOdbc = DartOdbc.nonBlocking(dsn: env['DSN']);
+    odbc = DartOdbc.nonBlocking(dsn: env['DSN']);
     await connect(
       username: env['USERNAME']!,
       password: env['PASSWORD']!,
@@ -34,43 +35,40 @@ class TestHelper {
     required String password,
     String? database,
   }) async {
-    await nonBlockingOdbc.connect(username: username, password: password);
-    await blockingOdbc.connect(username: username, password: password);
+    await odbc.connect(username: username, password: password);
 
     if (database != null) {
-      await nonBlockingOdbc.execute('USE $database');
-      await blockingOdbc.execute('USE $database');
+      await odbc.execute('USE $database');
     }
   }
 
   Future<String> connectWithConnectionString(String connectionString) {
-    return nonBlockingOdbc.connectWithConnectionString(connectionString);
+    return odbc.connectWithConnectionString(connectionString);
   }
 
   Future<List<Map<String, dynamic>>> query(
     String sql, {
     List<dynamic> params = const [],
   }) {
-    return nonBlockingOdbc.execute(sql, params: params);
+    return odbc.execute(sql, params: params);
   }
 
   Future<OdbcCursor> cursor(
     String sql, {
     List<dynamic> params = const [],
   }) async {
-    return blockingOdbc.executeCursor(
+    return odbc.executeCursor(
       sql,
       params: params,
     );
   }
 
   Future<void> disconnect() async {
-    await nonBlockingOdbc.disconnect();
-    await blockingOdbc.disconnect();
+    await odbc.disconnect();
   }
 
   IDartOdbc getOdbc() {
-    return nonBlockingOdbc;
+    return odbc;
   }
 }
 

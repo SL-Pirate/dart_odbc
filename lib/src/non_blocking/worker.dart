@@ -10,10 +10,10 @@ class OdbcIsolateClient extends IsolateClient {
   ///
   OdbcIsolateClient({this.dsn, this.pathToDriver});
 
-  ///
+  /// Shared. But strings are copiable and immutable
   final String? dsn;
 
-  ///
+  /// Shared. But strings are copiable and immutable
   final String? pathToDriver;
 
   /// THIS IS THE ONLY SHARED STATE INSIDE THE ISOLATE
@@ -25,6 +25,13 @@ class OdbcIsolateClient extends IsolateClient {
   /// So this is safe to be used
   /// As long as it's accessed using [_log]
   Logger? __log;
+
+  /// Cursors managed inside the isolate
+  // content will only be available inside the isolate
+  final Map<int, OdbcCursor> _cursors = {};
+
+  /// Next cursor ID
+  int _nextCursorId = 0;
 
   @override
   Future<void> initialize() async {
@@ -61,18 +68,19 @@ class OdbcIsolateClient extends IsolateClient {
     switch (command) {
       case OdbcCommand._create:
         if (__odbc != null) {
+          await _clearCursors();
           await __odbc!.disconnect();
         }
         final dsn = message.arguments['dsn'] as String?;
         final pathToDriver = message.arguments['pathToDriver'] as String?;
         __odbc = DartOdbc.blocking(dsn: dsn, pathToDriver: pathToDriver);
-        return ResponsePayload(null);
+        return ResponsePayload();
       case OdbcCommand.connect:
         await _odbc.connect(
           username: message.arguments['username'] as String,
           password: message.arguments['password'] as String,
         );
-        return ResponsePayload(null);
+        return ResponsePayload();
       case OdbcCommand.connectWithConnectionString:
         final connectionString =
             message.arguments['connectionString'] as String;
@@ -95,14 +103,33 @@ class OdbcIsolateClient extends IsolateClient {
         );
         return ResponsePayload(result);
       case OdbcCommand.executeCursor:
-        throw UnsupportedError(
-          'Cursors are not supported in non-blocking mode.',
+        return _executeCursor(
+          message.arguments['query'] as String,
+          message.arguments['params'] as List<dynamic>?,
         );
+      case OdbcCommand.cursorNext:
+        final cursorId = message.arguments['cursorId'] as int;
+        final cursor = _cursors[cursorId];
+        if (cursor == null) {
+          throw StateError('Cursor with ID $cursorId not found.');
+        }
+        final result = await cursor.next();
+        return ResponsePayload(result.toMap());
+      case OdbcCommand.cursorClose:
+        final cursorId = message.arguments['cursorId'] as int;
+        final cursor = _cursors.remove(cursorId);
+        if (cursor == null) {
+          _log.warning('Cursor with ID $cursorId not found for closing.');
+        } else {
+          await cursor.close();
+        }
+        return ResponsePayload();
       case OdbcCommand.disconnect:
         if (__odbc != null) {
+          await _clearCursors();
           await __odbc!.disconnect();
         }
-        return ResponsePayload(null);
+        return ResponsePayload();
     }
   }
 
@@ -114,6 +141,28 @@ class OdbcIsolateClient extends IsolateClient {
     await super.close();
   }
 
+  /// To be only used inside the isolate
+  Future<ResponsePayload> _executeCursor(
+    String query,
+    List<dynamic>? params,
+  ) async {
+    final cursor = await _odbc.executeCursor(query, params: params);
+    final cursorId = _nextCursorId++;
+    _cursors[cursorId] = cursor;
+
+    return ResponsePayload(cursorId);
+  }
+
+  /// To be only used inside the isolate
+  Future<void> _clearCursors() async {
+    for (final cursor in _cursors.values) {
+      await cursor.close();
+    }
+    _cursors.clear();
+    _nextCursorId = 0;
+  }
+
+  /// To be only used inside the isolate
   IDartOdbc get _odbc {
     if (__odbc == null) {
       throw StateError('ODBC instance is not initialized.');
@@ -131,6 +180,12 @@ class OdbcIsolateClient extends IsolateClient {
 enum OdbcCommand {
   /// To be used internally to create the ODBC instance inside the isolate
   _create,
+
+  /// Next command for cursor
+  cursorNext,
+
+  /// Close command for cursor
+  cursorClose,
 
   ///
   connect,

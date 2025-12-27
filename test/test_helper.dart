@@ -45,6 +45,16 @@ class TestHelper {
     return odbc.execute(sql, params: params);
   }
 
+  Future<OdbcCursor> cursor(
+    String sql, {
+    List<dynamic> params = const [],
+  }) async {
+    return odbc.executeCursor(
+      sql,
+      params: params,
+    );
+  }
+
   Future<void> disconnect() => odbc.disconnect();
 }
 

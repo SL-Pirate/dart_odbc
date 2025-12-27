@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
@@ -5,10 +6,11 @@ import 'package:ffi/ffi.dart';
 import 'package:logging/logging.dart';
 
 part 'init.dart';
-part 'connection.dart';
-part 'execute.dart';
-part 'handler.dart';
 part 'result.dart';
+part 'handler.dart';
+part 'connection.dart';
+part 'execute/execute.dart';
+part 'execute/get_tables.dart';
 
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
@@ -103,6 +105,14 @@ class DartOdbc implements IDartOdbc {
       operationType: operationType,
       onException: onException,
       beforeThrow: beforeThrow,
+    );
+  }
+
+  @override
+  Future<OdbcCursor> executeCursor(String query, {List<dynamic>? params}) {
+    return _executeCursor(
+      query,
+      params: params,
     );
   }
 }

@@ -61,6 +61,25 @@ abstract interface class IDartOdbc {
     List<dynamic>? params,
   });
 
+  /// Execute a query that returns a cursor
+  /// The [query] parameter is the SQL query to execute.
+  /// This function will return an [OdbcCursor] that can be used to pull rows
+  /// one at a time.
+  /// The [params] parameter is a list of parameters to bind to the query.
+  /// Example query:
+  /// ```dart
+  /// final OdbcCursor cursor = await odbc.executeCursor(
+  ///   'SELECT * FROM USERS WHERE UID = ?',
+  ///   params: [1],
+  /// );
+  /// ```
+  /// You can then use the cursor to pull rows one at a time.
+  /// For more information on using cursors, see the [OdbcCursor] documentation.
+  Future<OdbcCursor> executeCursor(
+    String query, {
+    List<dynamic>? params,
+  });
+
   /// Disconnects from the database.
   Future<void> disconnect();
 

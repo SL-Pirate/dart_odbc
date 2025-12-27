@@ -1,73 +1,6 @@
-part of './base.dart';
+part of '../base.dart';
 
 extension on DartOdbc {
-  Future<List<Map<String, dynamic>>> _getTables({
-    String? tableName,
-    String? catalog,
-    String? schema,
-    String? tableType,
-  }) async {
-    if (_hEnv == nullptr || _hConn == nullptr) {
-      throw ODBCException('Not connected to the database');
-    }
-
-    final pHStmt = calloc<SQLHSTMT>();
-    tryOdbc(
-      _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
-      handle: _hConn,
-      onException: HandleException(),
-      beforeThrow: () {
-        calloc.free(pHStmt);
-      },
-    );
-    final hStmt = pHStmt.value;
-
-    final cCatalog = catalog?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
-    final cSchema = schema?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
-    final cTableName =
-        tableName?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
-    final cTableType =
-        tableType?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
-
-    tryOdbc(
-      _sql.SQLTablesW(
-        hStmt,
-        cCatalog,
-        SQL_NTS,
-        cSchema,
-        SQL_NTS,
-        cTableName,
-        SQL_NTS,
-        cTableType,
-        SQL_NTS,
-      ),
-      handle: hStmt,
-      onException: FetchException(),
-      beforeThrow: () {
-        calloc
-          ..free(pHStmt)
-          ..free(cCatalog)
-          ..free(cSchema)
-          ..free(cTableName)
-          ..free(cTableType);
-      },
-    );
-
-    final result = _getResult(hStmt);
-
-    // Clean up
-    _freeSqlStmtHandle(hStmt);
-
-    calloc
-      ..free(pHStmt)
-      ..free(cCatalog)
-      ..free(cSchema)
-      ..free(cTableName)
-      ..free(cTableType);
-
-    return result;
-  }
-
   Future<List<Map<String, dynamic>>> _execute(
     String query, {
     List<dynamic>? params,
@@ -76,6 +9,25 @@ extension on DartOdbc {
       throw ODBCException('Not connected to the database');
     }
 
+    final hStmt = _execStatement(query, params);
+
+    return _getResultBulk(hStmt);
+  }
+
+  Future<OdbcCursor> _executeCursor(
+    String query, {
+    List<dynamic>? params,
+  }) async {
+    if (_hEnv == nullptr || _hConn == nullptr) {
+      throw ODBCException('Not connected to the database');
+    }
+
+    final hStmt = _execStatement(query, params);
+
+    return _getResult(hStmt);
+  }
+
+  Pointer<Void> _execStatement(String query, List<dynamic>? params) {
     final pointers = <OdbcPointer<dynamic>>[];
     final strLenPointers = <Pointer<Long>>[];
     final pHStmt = calloc<SQLHSTMT>();
@@ -87,7 +39,10 @@ extension on DartOdbc {
         calloc.free(pHStmt);
       },
     );
+
+    // hstatement will be freed by the cursor
     final hStmt = pHStmt.value;
+
     final cQuery = query.toNativeUtf16();
 
     // binding sanitized params
@@ -172,10 +127,6 @@ extension on DartOdbc {
       );
     }
 
-    final result = _getResult(hStmt);
-
-    _freeSqlStmtHandle(hStmt);
-
     // free memory
     for (final ptr in pointers) {
       ptr.free();
@@ -189,6 +140,6 @@ extension on DartOdbc {
       ..free(cQuery)
       ..free(pHStmt);
 
-    return result;
+    return hStmt;
   }
 }

@@ -56,6 +56,8 @@ void main() {
       if (env['DATABASE'] != null) 'DATABASE=${env['DATABASE']}',
     ].join(';');
 
+    // This is intentional for logging purposes
+    // ignore: avoid_print
     print(await connStrHelper.connectWithConnectionString(connectionString));
 
     // If connect fails, test throws before this line

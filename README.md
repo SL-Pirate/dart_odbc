@@ -80,6 +80,26 @@ final List<Map<String, dynamic>> result = await odbc.execute(
 );
 ```
 
+### Streaming support
+
+For large result sets, you can use the `executeCursor` method to stream results row by row without loading everything into memory at once.
+
+```dart
+final cursor = await odbc.executeCursor('SELECT * FROM LARGE_TABLE');
+try {
+  while (true) {
+    final row = await cursor.fetch();
+    if (row is CursorDone) {
+      break; // No more rows
+    }
+    // Process the row (which is a Map<String, dynamic>)
+    print(row);
+  }
+} finally {
+  await cursor.close(); // Ensure resources are freed
+}
+```
+
 #### Currently supported data types for parameter binding
 
 Below are currently supported data types for parameter binding. If this does not include a type that you are looking for, please open a feature request.

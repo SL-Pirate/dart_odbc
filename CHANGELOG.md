@@ -108,3 +108,7 @@
 ## 6.0.1
 
 - Removed unnecessary parameter setting for SQLBindParameter Column Size
+
+## 6.1.0
+
+- Implemented streaming support for query results. Now `DartOdbc.executeCursor` can be used to stream large result sets without loading everything into memory at once.

@@ -1,7 +1,7 @@
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:test/test.dart';
 
-import 'test_helper.dart';
+import '../test_helper.dart';
 
 void main() {
   final helper = TestHelper();

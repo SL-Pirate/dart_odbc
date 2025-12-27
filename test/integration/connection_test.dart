@@ -3,7 +3,7 @@ import 'package:dotenv/dotenv.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
-import 'test_helper.dart';
+import '../test_helper.dart';
 
 void main() {
   // enable logging

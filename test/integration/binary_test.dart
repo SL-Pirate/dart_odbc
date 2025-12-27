@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:open_url/open_url.dart';
 import 'package:test/test.dart';
 
-import 'test_helper.dart';
+import '../test_helper.dart';
 
 void main() {
   final helper = TestHelper();

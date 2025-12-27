@@ -14,7 +14,7 @@ part 'execute/get_tables.dart';
 
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
-class DartOdbc implements IDartOdbc {
+class DartOdbcBlockingClient implements IDartOdbc {
   /// DartOdbc constructor
   /// This constructor will initialize the ODBC environment and connection.
   /// The [pathToDriver] parameter is the path to the ODBC driver (optional).
@@ -24,7 +24,7 @@ class DartOdbc implements IDartOdbc {
   /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  DartOdbc({String? dsn, String? pathToDriver})
+  DartOdbcBlockingClient({String? dsn, String? pathToDriver})
       : __sql = discoverDriver(pathToDriver),
         _dsn = dsn {
     _initialize();
@@ -91,6 +91,10 @@ class DartOdbc implements IDartOdbc {
     await _disconnect();
   }
 
+  @Deprecated(
+    'tryOdbc exposes low-level synchronous ODBC semantics and will be removed '
+    'in a future release. It is not supported in non-blocking mode.',
+  )
   @override
   int tryOdbc(
     int status, {

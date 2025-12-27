@@ -1,6 +1,6 @@
 part of '../base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   Future<List<Map<String, dynamic>>> _execute(
     String query, {
     List<dynamic>? params,
@@ -31,7 +31,7 @@ extension on DartOdbc {
     final pointers = <OdbcPointer<dynamic>>[];
     final strLenPointers = <Pointer<Long>>[];
     final pHStmt = calloc<SQLHSTMT>();
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
       handle: _hConn,
       onException: HandleException(),
@@ -47,7 +47,7 @@ extension on DartOdbc {
 
     // binding sanitized params
     if (params != null) {
-      tryOdbc(
+      _tryOdbc(
         _sql.SQLPrepareW(hStmt, cQuery.cast(), SQL_NTS),
         handle: hStmt,
         onException: QueryException(),
@@ -69,7 +69,7 @@ extension on DartOdbc {
             : nullptr;
         strLenPointers.add(pStrLen);
 
-        tryOdbc(
+        _tryOdbc(
           _sql.SQLBindParameter(
             hStmt,
             i + 1,
@@ -104,7 +104,7 @@ extension on DartOdbc {
     }
 
     if (params == null) {
-      tryOdbc(
+      _tryOdbc(
         _sql.SQLExecDirectW(hStmt, cQuery.cast(), SQL_NTS),
         handle: hStmt,
         beforeThrow: () {
@@ -115,7 +115,7 @@ extension on DartOdbc {
         },
       );
     } else {
-      tryOdbc(
+      _tryOdbc(
         _sql.SQLExecute(hStmt),
         handle: hStmt,
         beforeThrow: () {

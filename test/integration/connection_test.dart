@@ -3,7 +3,7 @@ import 'package:dotenv/dotenv.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
-import 'test_helper.dart';
+import '../test_helper.dart';
 
 void main() {
   // enable logging
@@ -25,12 +25,8 @@ void main() {
 
   setUpAll(() {
     env = DotEnv()..load(['.env']);
-    helper = TestHelper(
-      DartOdbc(dsn: env['DSN']),
-    );
-    connStrHelper = TestHelper(
-      DartOdbc(),
-    );
+    helper = TestHelper(DartOdbc(dsn: env['DSN']));
+    connStrHelper = TestHelper(DartOdbc());
   });
 
   tearDownAll(() async {

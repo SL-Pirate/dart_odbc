@@ -6,6 +6,16 @@ This package is inspired by the obsolete [odbc](https://pub.dev/packages/odbc) p
 
 [![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
+## Features
+
+- Async-first API (`connect`, `execute`, `getTables`, ...)
+- Non-blocking by default: work is executed in a dedicated isolate so database calls don’t block the main isolate
+- Optional blocking client (`DartOdbcBlockingClient`) for environments where isolates are not desired
+- Prepared statements with positional parameters (`?`) to help sanitize user input
+- Cursor-based streaming (`executeCursor`) for large result sets (row-by-row fetching)
+- Lightweight schema discovery via `getTables`
+- Direct access to native ODBC bindings via `LibOdbc` for advanced use cases
+
 ## Usage
 
 ### Getting started

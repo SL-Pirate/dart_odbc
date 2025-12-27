@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import 'test_helper.dart';
+import '../test_helper.dart';
 
 void main() {
   final helper = TestHelper();
@@ -10,7 +10,7 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('list all tables', () async {
-    final tables = await helper.odbc.getTables();
+    final tables = await helper.getOdbc().getTables();
     expect(tables, isNotEmpty);
   });
 }

@@ -1,6 +1,6 @@
 part of '../base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   Future<List<Map<String, dynamic>>> _getTables({
     String? tableName,
     String? catalog,
@@ -12,7 +12,7 @@ extension on DartOdbc {
     }
 
     final pHStmt = calloc<SQLHSTMT>();
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, pHStmt),
       handle: _hConn,
       onException: HandleException(),
@@ -31,7 +31,7 @@ extension on DartOdbc {
     final cTableType =
         tableType?.toNativeUtf16().cast<UnsignedShort>() ?? nullptr;
 
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLTablesW(
         hStmt,
         cCatalog,

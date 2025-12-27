@@ -5,12 +5,20 @@ import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 
 class TestHelper {
-  TestHelper([DartOdbc? odbc]) {
-    if (odbc != null) this.odbc = odbc;
+  TestHelper([IDartOdbc? odbc]) {
+    if (odbc != null) {
+      this.odbc = odbc;
+    }
   }
 
-  late DartOdbc odbc;
+  late IDartOdbc odbc;
   late final DotEnv env;
+
+  String? get dsn => env['DSN'];
+
+  String get username => env['USERNAME']!;
+
+  String get password => env['PASSWORD']!;
 
   Future<void> initialize() async {
     env = DotEnv()..load(['.env']);
@@ -55,7 +63,13 @@ class TestHelper {
     );
   }
 
-  Future<void> disconnect() => odbc.disconnect();
+  Future<void> disconnect() async {
+    await odbc.disconnect();
+  }
+
+  IDartOdbc getOdbc() {
+    return odbc;
+  }
 }
 
 void main() {}

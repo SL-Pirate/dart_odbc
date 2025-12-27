@@ -1,6 +1,6 @@
 part of 'base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   Future<List<Map<String, dynamic>>> _getResultBulk(SQLHSTMT hStmt) async {
     final rows = <Map<String, dynamic>>[];
     final cursor = _getResult(hStmt);
@@ -33,7 +33,7 @@ class _OdbcCursorImpl implements OdbcCursor {
   /// while fetching the result set metadata.
   _OdbcCursorImpl({required this.odbc, required this.hStmt})
       : sql = odbc._sql,
-        tryOdbc = odbc.tryOdbc {
+        tryOdbc = odbc._tryOdbc {
     tryOdbc(
       sql.SQLNumResultCols(hStmt, pColumnCount),
       handle: hStmt,
@@ -86,7 +86,7 @@ class _OdbcCursorImpl implements OdbcCursor {
       ..free(pColumnNameLength);
   }
 
-  final DartOdbc odbc;
+  final DartOdbcBlockingClient odbc;
   SQLHSTMT hStmt;
 
   final LibOdbc sql;

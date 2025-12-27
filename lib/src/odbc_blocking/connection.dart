@@ -1,6 +1,6 @@
-part of './base.dart';
+part of 'base.dart';
 
-extension on DartOdbc {
+extension on DartOdbcBlockingClient {
   Future<void> _connect({
     required String username,
     required String password,
@@ -10,7 +10,7 @@ extension on DartOdbc {
     }
     final dsnLocal = _dsn!;
     final pHConn = calloc<SQLHDBC>();
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
       handle: _hEnv,
       operationType: SQL_HANDLE_DBC,
@@ -23,7 +23,7 @@ extension on DartOdbc {
     final cDsn = dsnLocal.toNativeUtf16().cast<UnsignedShort>();
     final cUsername = username.toNativeUtf16().cast<UnsignedShort>();
     final cPassword = password.toNativeUtf16().cast<UnsignedShort>();
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLConnectW(
         _hConn,
         cDsn,
@@ -53,7 +53,7 @@ extension on DartOdbc {
 
   Future<String> _connectWithConnectionString(String connectionString) async {
     final pHConn = calloc<SQLHDBC>();
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLAllocHandle(SQL_HANDLE_DBC, _hEnv, pHConn),
       handle: _hEnv,
       operationType: SQL_HANDLE_DBC,
@@ -69,7 +69,7 @@ extension on DartOdbc {
     final pOutConnectionString = calloc<Uint16>(outChars);
     final pOutConnectionStringLen = calloc<Short>();
 
-    tryOdbc(
+    _tryOdbc(
       _sql.SQLDriverConnectW(
         _hConn,
         nullptr,

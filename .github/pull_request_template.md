@@ -25,6 +25,7 @@
 - [ ] All new and existing tests passed
 - [ ] I have self-reviewed my code
 - [ ] I have updated the documentation (if necessary)
+- [ ] Pana test passes with at least 150/160 points
 
 ## Additional Notes
 <!-- Any additional information or comments for the reviewers -->

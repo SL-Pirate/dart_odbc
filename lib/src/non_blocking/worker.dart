@@ -5,9 +5,11 @@ import 'package:dart_odbc/src/worker/client.dart';
 import 'package:dart_odbc/src/worker/message.dart';
 import 'package:logging/logging.dart';
 
-///
+/// RPC style ODBC Isolate Client used for non-blocking ODBC operations.
+/// Note that each instance of this class 
+/// manages its own isolate and ODBC connection.
 class OdbcIsolateClient extends IsolateClient {
-  ///
+  /// Constructor for [OdbcIsolateClient].
   OdbcIsolateClient({this.dsn, this.pathToDriver});
 
   /// Shared. But strings are copiable and immutable
@@ -187,21 +189,21 @@ enum OdbcCommand {
   /// Close command for cursor
   cursorClose,
 
-  ///
+  /// Connect command
   connect,
 
-  ///
+  /// Connect with connection string command
   connectWithConnectionString,
 
-  ///
+  /// Get tables command
   getTables,
 
-  ///
+  /// Execute query command
   execute,
 
-  ///
+  /// Execute query with cursor command
   executeCursor,
 
-  ///
+  /// Disconnect command
   disconnect,
 }

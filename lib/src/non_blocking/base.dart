@@ -4,15 +4,15 @@ import 'package:dart_odbc/src/worker/client.dart';
 import 'package:dart_odbc/src/worker/message.dart';
 import 'package:logging/logging.dart';
 
-///
+/// Non-blocking ODBC client implementation.
 class DartOdbcNonBlocking implements IDartOdbc {
-  ///
+  /// Constructor for [DartOdbcNonBlocking].
   DartOdbcNonBlocking({this.dsn, this.pathToDriver});
 
-  ///
+  /// Data Source Name.
   final String? dsn;
 
-  ///
+  /// Path to the ODBC driver.
   final String? pathToDriver;
 
   final Logger _log = Logger('DartOdbcNonBlocking');

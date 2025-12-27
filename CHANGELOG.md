@@ -116,4 +116,4 @@
 ## 6.2.0
 
 - Implemented non-blocking ODBC operations using isolates.
-- Replaced the previous blocking ODBC implementation with a new non-blocking version as the default.
+- Made the new non-blocking ODBC implementation the default, while keeping the previous blocking implementation available as `DartOdbcBlockingClient` for users who still need blocking behavior.

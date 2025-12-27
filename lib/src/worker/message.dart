@@ -66,20 +66,20 @@ abstract class WorkerMessagePayload {
 /// Defines a standard message payload.
 class RequestPayload extends WorkerMessagePayload {
   /// Creates a new [RequestPayload].
-  RequestPayload(this.command, [this.arguments]);
+  RequestPayload(this.command, [this.arguments = const {}]);
 
   /// Creates a [RequestPayload] from a map.
   RequestPayload.fromMap(Map<String, dynamic> map)
       : command = map['command'] as String,
         arguments = map['arguments'] != null
-            ? List<dynamic>.from(map['arguments'] as List)
-            : null;
+            ? Map<String, dynamic>.from(map['arguments'] as Map)
+            : const {};
 
   /// The command to execute.
   final String command;
 
   /// The arguments for the command.
-  final List<dynamic>? arguments;
+  final Map<String, dynamic> arguments;
 
   @override
   Map<String, dynamic> toMap() {

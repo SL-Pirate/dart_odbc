@@ -4,14 +4,14 @@ import 'package:test/test.dart';
 
 class TestIsolateClient extends IsolateClient {
   @override
-  ResponsePayload handleeMessage(RequestPayload message) {
+  ResponsePayload handleMessage(RequestPayload message) {
     switch (message.command) {
       case 'ping':
         return ResponsePayload(true);
 
       case 'add':
         return ResponsePayload(
-          (message.arguments![0] as int) + (message.arguments![1] as int),
+          (message.arguments['a'] as int) + (message.arguments['b'] as int),
         );
 
       case 'throw':
@@ -45,7 +45,7 @@ void main() {
     test('handles multiple concurrent requests', () async {
       final futures = List.generate(
         10,
-        (i) => client.request(RequestPayload('add', [i, i])),
+        (i) => client.request(RequestPayload('add', {'a': i, 'b': i})),
       );
 
       final results = await Future.wait(futures);
@@ -75,8 +75,8 @@ void main() {
     });
 
     test('request ids are matched correctly', () async {
-      final r1 = client.request(RequestPayload('add', [1, 2]));
-      final r2 = client.request(RequestPayload('add', [10, 20]));
+      final r1 = client.request(RequestPayload('add', {'a': 1, 'b': 2}));
+      final r2 = client.request(RequestPayload('add', {'a': 10, 'b': 20}));
 
       final res1 = await r1;
       final res2 = await r2;

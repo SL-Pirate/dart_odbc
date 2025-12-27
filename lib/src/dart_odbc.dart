@@ -95,6 +95,10 @@ abstract interface class IDartOdbc {
   /// The [beforeThrow] parameter is an optional callback that is executed
   /// before throwing the exception. This can be used for cleanup or logging.
   /// Returns the status code if it indicates success.
+  @Deprecated(
+    'tryOdbc exposes low-level synchronous ODBC semantics and will be removed '
+    'in a future release. It is not supported in non-blocking mode.',
+  )
   int tryOdbc(
     int status, {
     SQLHANDLE? handle,

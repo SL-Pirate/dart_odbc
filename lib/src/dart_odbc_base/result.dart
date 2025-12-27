@@ -33,7 +33,7 @@ class _OdbcCursorImpl implements OdbcCursor {
   /// while fetching the result set metadata.
   _OdbcCursorImpl({required this.odbc, required this.hStmt})
       : sql = odbc._sql,
-        tryOdbc = odbc.tryOdbc {
+        tryOdbc = odbc._tryOdbc {
     tryOdbc(
       sql.SQLNumResultCols(hStmt, pColumnCount),
       handle: hStmt,

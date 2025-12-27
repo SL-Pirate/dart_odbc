@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
+import 'package:dart_odbc/src/non_blocking/base.dart';
 import 'package:ffi/ffi.dart';
 import 'package:logging/logging.dart';
 
@@ -29,6 +30,20 @@ class DartOdbc implements IDartOdbc {
         _dsn = dsn {
     _initialize();
   }
+
+  DartOdbc._(String? dsn, String? pathToDriver)
+      : __sql = discoverDriver(pathToDriver),
+        _dsn = dsn {
+    _initialize();
+  }
+
+  /// Creates a blocking [IDartOdbc] instance.
+  static IDartOdbc blocking({String? dsn, String? pathToDriver}) =>
+      DartOdbc._(dsn, pathToDriver);
+
+  /// Creates a non-blocking [IDartOdbc] instance.
+  static IDartOdbc nonBlocking({String? dsn, String? pathToDriver}) =>
+      DartOdbcNonBlocking(dsn: dsn, pathToDriver: pathToDriver);
 
   final LibOdbc? __sql;
   final String? _dsn;
@@ -91,6 +106,10 @@ class DartOdbc implements IDartOdbc {
     await _disconnect();
   }
 
+  @Deprecated(
+    'tryOdbc exposes low-level synchronous ODBC semantics and will be removed '
+    'in a future release. It is not supported in non-blocking mode.',
+  )
   @override
   int tryOdbc(
     int status, {

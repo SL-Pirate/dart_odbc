@@ -26,10 +26,16 @@ void main() {
   setUpAll(() {
     env = DotEnv()..load(['.env']);
     helper = TestHelper(
-      DartOdbc(dsn: env['DSN']),
+      (
+        DartOdbc(dsn: env['DSN']),
+        DartOdbc.nonBlocking(dsn: env['DSN']),
+      ),
     );
     connStrHelper = TestHelper(
-      DartOdbc(),
+      (
+        DartOdbc(),
+        DartOdbc.nonBlocking(),
+      ),
     );
   });
 

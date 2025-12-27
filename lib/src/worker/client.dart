@@ -7,7 +7,7 @@ import 'package:dart_odbc/src/worker/message.dart';
 abstract class IsolateClient {
   /// Creates a new [IsolateClient].
   IsolateClient() {
-    _ready = _init();
+    _ready = initialize();
   }
 
   late final Future<void> _ready;
@@ -19,56 +19,8 @@ abstract class IsolateClient {
   int _nextId = 0;
   final Map<int, Completer<WorkerMessagePayload>> _pending = {};
 
-  /// Sends a request to the worker isolate and returns the response.
-  Future<WorkerMessagePayload> request(
-    RequestPayload payload,
-  ) async {
-    if (_isClosed) {
-      throw StateError('IsolateClient is closed.');
-    }
-
-    await _ready;
-
-    final id = _nextId++;
-    final completer = Completer<WorkerMessagePayload>();
-    _pending[id] = completer;
-
-    _sendPort.send(
-      WorkerMessage(
-        id: id,
-        type: WorkerMessageType.request,
-        payload: payload,
-      ).toMap(),
-    );
-
-    return completer.future;
-  }
-
-  /// Handles incoming messages from the worker isolate.
-  FutureOr<ResponsePayload> handleeMessage(RequestPayload message);
-
-  /// Whether the client is open.
-  bool get isOpen => !_isClosed;
-
-  /// Closes the worker isolate.
-  Future<void> close() async {
-    if (_isClosed) return;
-    _isClosed = true;
-
-    await _ready;
-
-    for (final completer in _pending.values) {
-      completer.completeError(
-        Exception('IsolateClient closed before response was received.'),
-      );
-    }
-    _pending.clear();
-
-    _receivePort.close();
-    _isolate.kill(priority: Isolate.immediate);
-  }
-
-  Future<void> _init() async {
+  /// Initializes the worker isolate.
+  Future<void> initialize() async {
     final initPort = RawReceivePort();
     final connection = Completer<(ReceivePort, SendPort)>.sync();
     initPort.handler = (dynamic initialMessage) {
@@ -93,10 +45,67 @@ abstract class IsolateClient {
     _receivePort = receivePort;
     _sendPort = sendPort;
 
-    _receivePort.listen(_handleMessage);
+    _receivePort.listen(_onMessage);
   }
 
-  void _handleMessage(dynamic msg) {
+  /// Sends a request to the worker isolate and returns the response.
+  Future<WorkerMessagePayload> request(
+    RequestPayload payload,
+  ) async {
+    if (_isClosed) {
+      throw StateError('IsolateClient is closed.');
+    }
+
+    await _ready;
+
+    return bootstrapRequest(payload);
+  }
+
+  /// Sends a request to the worker isolate
+  /// without checking if the client is closed or initialized.
+  /// Only to be used internally for initialization
+  /// @protected
+  Future<WorkerMessagePayload> bootstrapRequest(RequestPayload payload) async {
+    final id = _nextId++;
+    final completer = Completer<WorkerMessagePayload>();
+    _pending[id] = completer;
+
+    _sendPort.send(
+      WorkerMessage(
+        id: id,
+        type: WorkerMessageType.request,
+        payload: payload,
+      ).toMap(),
+    );
+
+    return completer.future;
+  }
+
+  /// Handles incoming messages from the worker isolate.
+  FutureOr<ResponsePayload> handleMessage(RequestPayload message);
+
+  /// Whether the client is open.
+  bool get isOpen => !_isClosed;
+
+  /// Closes the worker isolate.
+  Future<void> close() async {
+    if (_isClosed) return;
+    _isClosed = true;
+
+    await _ready;
+
+    for (final completer in _pending.values) {
+      completer.completeError(
+        Exception('IsolateClient closed before response was received.'),
+      );
+    }
+    _pending.clear();
+
+    _receivePort.close();
+    _isolate.kill(priority: Isolate.immediate);
+  }
+
+  void _onMessage(dynamic msg) {
     final message = WorkerMessage.fromMap(Map.from(msg as Map));
 
     final completer = _pending.remove(message.id);
@@ -122,7 +131,7 @@ abstract class IsolateClient {
       final msg = WorkerMessage.fromMap(Map.from(message as Map));
 
       try {
-        final result = await handleeMessage(msg.payload as RequestPayload);
+        final result = await handleMessage(msg.payload as RequestPayload);
 
         mainSendPort.send(
           WorkerMessage(

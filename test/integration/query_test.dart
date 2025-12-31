@@ -10,7 +10,7 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('simple select returns rows', () async {
-    final result = await helper.query('SELECT * FROM USERS');
+    final result = await helper.exec('SELECT * FROM USERS');
 
     expect(result, isA<List<Map<String, dynamic>>>());
     expect(result.isNotEmpty, true);

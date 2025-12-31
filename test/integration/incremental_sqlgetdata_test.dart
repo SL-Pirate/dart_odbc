@@ -10,7 +10,7 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('read long NVARCHAR via incremental SQLGetData (no garbage)', () async {
-    final rows = await helper.query('SELECT @@VERSION AS version;');
+    final rows = await helper.exec('SELECT @@VERSION AS version;');
 
     expect(rows, isNotEmpty);
 

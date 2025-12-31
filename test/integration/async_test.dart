@@ -11,7 +11,7 @@ void main() {
 
   test('parallel async query test', () async {
     final futures = List.generate(10, (index) {
-      return helper.query(
+      return helper.exec(
         'SELECT ? AS index_value;',
         params: [index],
       );

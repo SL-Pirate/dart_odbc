@@ -10,7 +10,7 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('parameterized query works', () async {
-    final result = await helper.query(
+    final result = await helper.exec(
       'SELECT NAME FROM USERS WHERE UID = ?',
       params: [1],
     );

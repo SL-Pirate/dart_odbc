@@ -4,11 +4,14 @@
 import 'dart:ffi';
 
 import 'package:dart_odbc/dart_odbc.dart';
+import 'package:logging/logging.dart';
 
 ///
 class LibOdbcExt extends LibOdbc {
   ///
   LibOdbcExt(super.dynamicLibrary);
+
+  final _log = Logger('LibOdbcExt');
 
   @override
   int SQLAllocHandle(
@@ -19,6 +22,11 @@ class LibOdbcExt extends LibOdbc {
     try {
       return super.SQLAllocHandle(HandleType, InputHandle, OutputHandle);
     } catch (e) {
+      _log.severe(
+        'Error allocating ODBC handle of type $HandleType!. Trying fallback.',
+        e,
+      );
+
       if (HandleType == SQL_HANDLE_DBC) {
         return super.SQLAllocConnect(InputHandle, OutputHandle);
       } else if (HandleType == SQL_HANDLE_ENV) {

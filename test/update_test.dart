@@ -13,22 +13,22 @@ void main() {
     const uid = 1002;
 
     // Ensure row exists
-    await helper.query(
+    await helper.exec(
       'DELETE FROM USERS WHERE UID = ?',
       params: [uid],
     );
 
-    await helper.query(
+    await helper.exec(
       'INSERT INTO USERS (UID, NAME, DESCRIPTION) VALUES (?, ?, ?)',
       params: [uid, 'Dana', 'Before update'],
     );
 
-    await helper.query(
+    await helper.exec(
       'UPDATE USERS SET DESCRIPTION = ? WHERE UID = ?',
       params: ['After update', uid],
     );
 
-    final result = await helper.query(
+    final result = await helper.exec(
       'SELECT DESCRIPTION FROM USERS WHERE UID = ?',
       params: [uid],
     );

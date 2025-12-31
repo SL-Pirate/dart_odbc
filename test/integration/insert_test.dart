@@ -13,17 +13,17 @@ void main() {
     const uid = 1001;
 
     // Ensure clean state (idempotent)
-    await helper.query(
+    await helper.exec(
       'DELETE FROM USERS WHERE UID = ?',
       params: [uid],
     );
 
-    await helper.query(
+    await helper.exec(
       'INSERT INTO USERS (UID, NAME, DESCRIPTION) VALUES (?, ?, ?)',
       params: [uid, 'Charlie', 'Inserted from test'],
     );
 
-    final result = await helper.query(
+    final result = await helper.exec(
       'SELECT NAME, DESCRIPTION FROM USERS WHERE UID = ?',
       params: [uid],
     );

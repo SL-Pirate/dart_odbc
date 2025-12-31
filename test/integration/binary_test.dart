@@ -24,7 +24,7 @@ void main() {
   test(
     'query an image from the database, embed it in html and show it to user',
     () async {
-      final imgData = await helper.query(
+      final imgData = await helper.exec(
         'SELECT DATA FROM BINARY_TABLE WHERE ID = 1',
       );
       expect(imgData, isNotEmpty);

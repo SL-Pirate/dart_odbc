@@ -46,7 +46,7 @@ class TestHelper {
     return odbc.connectWithConnectionString(connectionString);
   }
 
-  Future<List<Map<String, dynamic>>> query(
+  Future<List<Map<String, dynamic>>> exec(
     String sql, {
     List<dynamic> params = const [],
   }) {

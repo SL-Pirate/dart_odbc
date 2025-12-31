@@ -10,7 +10,7 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('date time support test', () async {
-    final results = await helper.query(
+    final results = await helper.exec(
       '''
         SELECT * FROM USERS
         WHERE BIRTHDAY = ?

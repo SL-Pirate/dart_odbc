@@ -18,7 +18,7 @@ void main() {
     // }
 
     expect(
-      () => helper.query('SELECT * FROM DOES_NOT_EXIST'),
+      () => helper.exec('SELECT * FROM DOES_NOT_EXIST'),
       throwsA(isA<Exception>()),
     );
   });

@@ -17,9 +17,15 @@ windows/
 
 # env
 .env
+test.env
 
 # temporary file created by tests
 test.png
 
 # temporary files
 SECURITY_REVIEW.md
+
+# IDE and AI tool directories
+.agent/
+.claude/
+.cursor/

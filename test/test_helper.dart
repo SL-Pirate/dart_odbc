@@ -3,6 +3,28 @@
 
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
+import 'package:logging/logging.dart';
+
+/// Logger for test output
+/// This logger is public so it can be used in test files
+final testLog = Logger('Test');
+
+/// Setup logging for tests - configures Logger to print to console
+void setupTestLogging() {
+  Logger.root.level = Level.FINE;
+
+  Logger.root.onRecord.listen((record) {
+    // This print is necessary - it's the mechanism by which the logging
+    // package outputs to console. Without it, testLog.info() would not
+    // produce visible output.
+    // ignore: avoid_print
+    print(
+      '[${record.level.name}] '
+      '${record.loggerName}: '
+      '${record.message}',
+    );
+  });
+}
 
 class TestHelper {
   TestHelper([IDartOdbc? odbc]) {

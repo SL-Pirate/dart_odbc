@@ -1,23 +1,11 @@
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
-import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
 import '../test_helper.dart';
 
 void main() {
-  // enable logging
-  Logger.root.level = Level.FINE;
-
-  Logger.root.onRecord.listen((record) {
-    // This is intentional for logging purposes
-    // ignore: avoid_print
-    print(
-      '[${record.level.name}] '
-      '${record.loggerName}: '
-      '${record.message}',
-    );
-  });
+  setupTestLogging();
 
   late DotEnv env;
   late TestHelper helper;
@@ -52,9 +40,9 @@ void main() {
       if (env['DATABASE'] != null) 'DATABASE=${env['DATABASE']}',
     ].join(';');
 
-    // This is intentional for logging purposes
-    // ignore: avoid_print
-    print(await connStrHelper.connectWithConnectionString(connectionString));
+    final result =
+        await connStrHelper.connectWithConnectionString(connectionString);
+    testLog.info(result);
 
     // If connect fails, test throws before this line
     expect(true, isTrue);

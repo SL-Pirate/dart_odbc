@@ -3,6 +3,8 @@ import 'package:test/test.dart';
 import '../test_helper.dart';
 
 void main() {
+  setupTestLogging();
+
   final helper = TestHelper();
 
   setUpAll(helper.initialize);
@@ -14,10 +16,8 @@ void main() {
 
     expect(rows, isNotEmpty);
 
-    final version = rows[0]['version'] as String?;
+    final version = rows[0]['version'] as String;
     expect(version, isNotNull);
-    //
-    // ignore: avoid_print
-    print(version);
+    testLog.info(version);
   });
 }

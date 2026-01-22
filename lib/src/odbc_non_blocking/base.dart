@@ -47,7 +47,8 @@ class DartOdbc implements IDartOdbc {
 
     if (result is ErrorPayload) {
       _logStackTrace(result.stackTrace);
-      throw ODBCException('Error connecting: ${result.data}');
+      throw ConnectionException()
+        ..message = 'Error connecting: ${result.data}';
     }
   }
 
@@ -71,9 +72,9 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException(
-        'Error connecting with connection string: ${response.data}',
-      );
+      throw ConnectionException()
+        ..message =
+            'Error connecting with connection string: ${response.data}';
     }
 
     return (response as ResponsePayload).data as String;
@@ -91,7 +92,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error disconnecting: ${response.data}');
+      throw ConnectionException()
+        ..message = 'Error disconnecting: ${response.data}';
     }
 
     await _isolateClient!.close();
@@ -104,7 +106,8 @@ class DartOdbc implements IDartOdbc {
     List<dynamic>? params,
   }) async {
     if (_isolateClient == null) {
-      throw ODBCException('Not connected to any database.');
+      throw ConnectionException()
+        ..message = 'Not connected to any database.';
     }
 
     final response = await _isolateClient!.request(
@@ -119,7 +122,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error executing query: ${response.data}');
+      throw QueryException()
+        ..message = 'Error executing query: ${response.data}';
     }
 
     return _getQueryDataFromResponse(response);
@@ -133,7 +137,8 @@ class DartOdbc implements IDartOdbc {
     String? columnName,
   }) async {
     if (_isolateClient == null) {
-      throw ODBCException('Not connected to any database.');
+      throw ConnectionException()
+        ..message = 'Not connected to any database.';
     }
 
     final response = await _isolateClient!.request(
@@ -150,7 +155,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error getting columns: ${response.data}');
+      throw FetchException()
+        ..message = 'Error getting columns: ${response.data}';
     }
 
     return _getQueryDataFromResponse(response);
@@ -163,7 +169,8 @@ class DartOdbc implements IDartOdbc {
     String? schema,
   }) async {
     if (_isolateClient == null) {
-      throw ODBCException('Not connected to any database.');
+      throw ConnectionException()
+        ..message = 'Not connected to any database.';
     }
 
     final response = await _isolateClient!.request(
@@ -179,7 +186,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error getting primary keys: ${response.data}');
+      throw FetchException()
+        ..message = 'Error getting primary keys: ${response.data}';
     }
 
     return _getQueryDataFromResponse(response);
@@ -195,7 +203,8 @@ class DartOdbc implements IDartOdbc {
     String? fkSchema,
   }) async {
     if (_isolateClient == null) {
-      throw ODBCException('Not connected to any database.');
+      throw ConnectionException()
+        ..message = 'Not connected to any database.';
     }
 
     final response = await _isolateClient!.request(
@@ -214,7 +223,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error getting foreign keys: ${response.data}');
+      throw FetchException()
+        ..message = 'Error getting foreign keys: ${response.data}';
     }
 
     return _getQueryDataFromResponse(response);
@@ -226,7 +236,8 @@ class DartOdbc implements IDartOdbc {
     List<dynamic>? params,
   }) async {
     if (_isolateClient == null) {
-      throw ODBCException('Not connected to any database.');
+      throw ConnectionException()
+        ..message = 'Not connected to any database.';
     }
 
     final response = await _isolateClient!.request(
@@ -241,7 +252,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error executing cursor: ${response.data}');
+      throw QueryException()
+        ..message = 'Error executing cursor: ${response.data}';
     }
 
     final cursorId = (response as ResponsePayload).data as int;
@@ -259,7 +271,8 @@ class DartOdbc implements IDartOdbc {
     String? tableType,
   }) async {
     if (_isolateClient == null) {
-      throw ODBCException('Not connected to any database.');
+      throw ConnectionException()
+        ..message = 'Not connected to any database.';
     }
 
     final response = await _isolateClient!.request(
@@ -276,7 +289,8 @@ class DartOdbc implements IDartOdbc {
 
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
-      throw ODBCException('Error fetching tables: ${response.data}');
+      throw FetchException()
+        ..message = 'Error fetching tables: ${response.data}';
     }
 
     return _getQueryDataFromResponse(response);
@@ -310,7 +324,8 @@ class DartOdbc implements IDartOdbc {
     WorkerMessagePayload response,
   ) {
     if (response is! ResponsePayload) {
-      throw ODBCException('Invalid response payload type.');
+      throw FetchException()
+        ..message = 'Invalid response payload type.';
     }
 
     return (response.data as List)
@@ -356,7 +371,8 @@ class _IndexedOdbcCursor implements OdbcCursor {
         null,
         result.stackTrace,
       );
-      throw ODBCException('Error fetching next cursor item: ${result.data}');
+      throw FetchException()
+        ..message = 'Error fetching next cursor item: ${result.data}';
     }
 
     return CursorResult.fromMap(

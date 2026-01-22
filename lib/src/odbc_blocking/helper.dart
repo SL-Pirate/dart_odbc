@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
@@ -55,28 +54,6 @@ class OdbcConversions {
 
   /// Function to get the SQL type from a Dart type
   static int getSqlTypeFromType(Type type) {
-    // #region agent log
-    try {
-      File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-          .writeAsStringSync(
-        '${jsonEncode({
-              'sessionId': 'debug-session',
-              'runId': 'run1',
-              'hypothesisId': 'C',
-              'location': 'helper.dart:getSqlTypeFromType',
-              'message': 'Getting SQL type from Dart type',
-              'data': {
-                'dartType': type.toString(),
-                'timestamp': DateTime.now().millisecondsSinceEpoch,
-              },
-            })}\n',
-        mode: FileMode.append,
-      );
-    } on Exception {
-      // Ignore logging errors
-    }
-    // #endregion
-
     if (type == int) {
       return SQL_INTEGER;
     } else if (type == double) {
@@ -85,28 +62,6 @@ class OdbcConversions {
       // Use SQL_WVARCHAR with actual ColumnSize matching string length
       // Testing if this works with proper ColumnSize/BufferLength relationship
       const sqlType = SQL_WVARCHAR;
-      // #region agent log
-      try {
-        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-            .writeAsStringSync(
-          '${jsonEncode({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'C',
-                'location': 'helper.dart:getSqlTypeFromType',
-                'message': 'Returning SQL type for String',
-                'data': {
-                  'sqlType': sqlType,
-                  'sqlTypeName': 'SQL_WVARCHAR',
-                  'timestamp': DateTime.now().millisecondsSinceEpoch,
-                },
-              })}\n',
-          mode: FileMode.append,
-        );
-      } on Exception {
-        // Ignore logging errors
-      }
-      // #endregion
       return sqlType;
     } else if (type == bool) {
       return SQL_BIT;
@@ -125,7 +80,7 @@ class OdbcConversions {
   /// This is used for binding parameters to the statement
   static int getDecimalDigitsFromType(Type type) {
     if (type == DateTime) {
-      return 6;
+      return dateTimeDecimalDigits;
     }
 
     return 0;
@@ -136,31 +91,6 @@ class OdbcConversions {
   /// Based on ODBC and SQL Server specifications
   /// Using actual string length to avoid HY104 errors
   static int getColumnSizeFromValue(dynamic value, Type type) {
-    // #region agent log
-    try {
-      File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-          .writeAsStringSync(
-        '${jsonEncode({
-              'sessionId': 'debug-session',
-              'runId': 'run1',
-              'hypothesisId': 'A',
-              'location': 'helper.dart:getColumnSizeFromValue',
-              'message': 'Getting ColumnSize from value',
-              'data': {
-                'dartType': type.toString(),
-                'valueType': value.runtimeType.toString(),
-                'isString': value is String,
-                'stringLength': value is String ? value.length : null,
-                'timestamp': DateTime.now().millisecondsSinceEpoch,
-              },
-            })}\n',
-        mode: FileMode.append,
-      );
-    } on Exception {
-      // Ignore logging errors
-    }
-    // #endregion
-
     if (type == String) {
       // For SQL_WVARCHAR, ColumnSize is the maximum number of characters
       // ODBC Driver 18 may require ColumnSize to match actual string length
@@ -168,28 +98,6 @@ class OdbcConversions {
       final length = stringValue.length;
       // ColumnSize in characters (not including null terminator)
       final columnSize = length > 0 ? length : 1;
-      // #region agent log
-      try {
-        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-            .writeAsStringSync(
-          '${jsonEncode({
-                'sessionId': 'debug-session',
-                'runId': 'post-fix',
-                'hypothesisId': 'B',
-                'location': 'helper.dart:getColumnSizeFromValue',
-                'message': 'Returning ColumnSize for String (FIXED)',
-                'data': {
-                  'columnSize': columnSize,
-                  'actualStringLength': stringValue.length,
-                  'timestamp': DateTime.now().millisecondsSinceEpoch,
-                },
-              })}\n',
-          mode: FileMode.append,
-        );
-      } on Exception {
-        // Ignore logging errors
-      }
-      // #endregion
       return columnSize;
     } else if (type == Uint8List || type == List) {
       // For SQL_BINARY/VARBINARY, ColumnSize is the maximum number of bytes
@@ -197,7 +105,7 @@ class OdbcConversions {
       return binLength > 0 ? binLength : 1;
     } else if (type == DateTime) {
       // For SQL_TIMESTAMP, ColumnSize is 23 (YYYY-MM-DD HH:MM:SS.FFFFFF)
-      return 23;
+      return sqlTimestampColumnSize;
     }
 
     // For numeric types (int, double, bool), return 0
@@ -211,30 +119,6 @@ class OdbcConversions {
     if (value is String) {
       final result = value.toNativeUtf16();
       final bufferSize = result.length * sizeOf<Uint16>();
-      // #region agent log
-      try {
-        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-            .writeAsStringSync(
-          '${jsonEncode({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'F',
-                'location': 'helper.dart:toPointer',
-                'message': 'Allocating buffer for string',
-                'data': {
-                  'stringValue': value,
-                  'stringLength': value.length,
-                  'bufferSizeBytes': bufferSize,
-                  'resultLength': result.length,
-                  'timestamp': DateTime.now().millisecondsSinceEpoch,
-                },
-              })}\n',
-          mode: FileMode.append,
-        );
-      } on Exception {
-        // Ignore logging errors
-      }
-      // #endregion
       return OdbcPointer<Utf16>(
         result.cast(),
         bufferSize,
@@ -339,6 +223,18 @@ class OdbcPointer<T extends NativeType> {
 
 /// default Buffer size (match OS page size)
 const defaultBufferSize = 4096;
+
+/// SQL state string length (SQL_STATE_LENGTH)
+const sqlStateLength = 6;
+
+/// Maximum error message buffer size in characters
+const maxErrorMessageLength = 1024;
+
+/// SQL_TIMESTAMP column size (YYYY-MM-DD HH:MM:SS.FFFFFF)
+const sqlTimestampColumnSize = 23;
+
+/// Decimal digits for DateTime type
+const dateTimeDecimalDigits = 6;
 
 /// Check if the SQL type is a binary type
 bool isSQLTypeBinary(int type) {

@@ -28,6 +28,10 @@ extension on DartOdbcBlockingClient {
   }
 
   Pointer<Void> _execStatement(String query, List<dynamic>? params) {
+    if (params != null) {
+      _validateParams(params);
+    }
+
     final pointers = <OdbcPointer<dynamic>>[];
     final strLenPointers = <Pointer<Long>>[];
     final pHStmt = calloc<SQLHSTMT>();
@@ -44,7 +48,24 @@ extension on DartOdbcBlockingClient {
     final hStmt = pHStmt.value;
 
     // WORKAROUND for ODBC Driver 18 HY104 issue
-    // String params use SQLExecDirectW, others use prepared statements
+    // ODBC Driver 18 for SQL Server returns HY104 (Invalid parameter value)
+    // when binding string parameters using SQLBindParameter with SQL_WVARCHAR.
+    // This workaround substitutes string parameters directly into the query
+    // using SQLExecDirectW, while non-string parameters continue to use
+    // prepared statements for security.
+    //
+    // Security considerations:
+    // - String parameters are escaped using SQL standard (single quotes
+    //   doubled)
+    // - This prevents SQL injection but is less secure than parameter binding
+    // - Non-string parameters still use prepared statements (secure)
+    //
+    // Limitations:
+    // - String parameters cannot be null (use empty string instead)
+    // - Performance may be slightly worse due to lack of query plan caching
+    //
+    // TODO(odbc): Investigate root cause and remove workaround when ODBC Driver
+    //             18 issue is resolved or alternative binding method is found.
     final hasStringParams = params != null && params.any((p) => p is String);
 
     String finalQuery;
@@ -61,31 +82,6 @@ extension on DartOdbcBlockingClient {
       );
       finalQuery = substitutedQuery;
       remainingParams = nonStringParams.isEmpty ? null : nonStringParams;
-
-      // #region agent log
-      try {
-        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-            .writeAsStringSync(
-          '${jsonEncode({
-                'sessionId': 'debug-session',
-                'runId': 'run1',
-                'hypothesisId': 'J',
-                'location': 'execute.dart:_execStatement',
-                'message': 'Using SQLExecDirectW workaround for string params',
-                'data': {
-                  'originalQuery': query,
-                  'finalQuery': finalQuery,
-                  'hasStringParams': true,
-                  'remainingParamsCount': remainingParams?.length ?? 0,
-                  'timestamp': DateTime.now().millisecondsSinceEpoch,
-                },
-              })}\n',
-          mode: FileMode.append,
-        );
-      } on Exception {
-        // Ignore logging errors
-      }
-      // #endregion
     } else {
       // No string parameters, use normal prepared statement flow
       finalQuery = query;
@@ -142,41 +138,6 @@ extension on DartOdbcBlockingClient {
           param.runtimeType,
         );
 
-        // #region agent log
-        try {
-          File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-              .writeAsStringSync(
-            '${jsonEncode({
-                  'sessionId': 'debug-session',
-                  'runId': 'run1',
-                  'hypothesisId': 'A,B,C,D,E',
-                  'location': 'execute.dart:_execStatement',
-                  'message': 'Before SQLBindParameter call',
-                  'data': {
-                    'paramIndex': i + 1,
-                    'paramType': param.runtimeType.toString(),
-                    'paramValue': param is String ? param : param.toString(),
-                    'paramLength': param is String ? param.length : null,
-                    'cType': cType,
-                    'sqlType': sqlType,
-                    'columnSize': columnSize,
-                    'decimalDigits': decimalDigits,
-                    'bufferLength': bufferLength,
-                    'strLenValue': pStrLen != nullptr ? pStrLen.value : null,
-                    'isSQL_NTS': false,
-                    'strLenBytes': param is String
-                        ? param.length * sizeOf<Uint16>()
-                        : null,
-                    'timestamp': DateTime.now().millisecondsSinceEpoch,
-                  },
-                })}\n',
-            mode: FileMode.append,
-          );
-        } on Exception {
-          // Ignore logging errors
-        }
-        // #endregion
-
         final bindResult = _sql.SQLBindParameter(
           hStmt,
           i + 1,
@@ -189,30 +150,6 @@ extension on DartOdbcBlockingClient {
           bufferLength,
           pStrLen,
         );
-
-        // #region agent log
-        try {
-          File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-              .writeAsStringSync(
-            '${jsonEncode({
-                  'sessionId': 'debug-session',
-                  'runId': 'run1',
-                  'hypothesisId': 'A,B,C,D,E',
-                  'location': 'execute.dart:_execStatement',
-                  'message': 'After SQLBindParameter call',
-                  'data': {
-                    'paramIndex': i + 1,
-                    'bindResult': bindResult,
-                    'isSuccess': bindResult >= 0,
-                    'timestamp': DateTime.now().millisecondsSinceEpoch,
-                  },
-                })}\n',
-            mode: FileMode.append,
-          );
-        } on Exception {
-          // Ignore logging errors
-        }
-        // #endregion
 
         _tryOdbc(
           bindResult,
@@ -277,9 +214,16 @@ extension on DartOdbcBlockingClient {
     return hStmt;
   }
 
-  /// Substitute string parameters directly in query with escaped values
-  /// Returns the substituted query and list of remaining non-string parameters
-  /// Workaround for ODBC Driver 18 HY104 issue with string parameter binding
+  /// Substitute string parameters directly in query with escaped values.
+  ///
+  /// Returns the substituted query and list of remaining non-string parameters.
+  ///
+  /// This is a workaround for ODBC Driver 18 HY104 issue with string parameter
+  /// binding. String parameters are escaped using SQL standard (single quotes
+  /// doubled) to prevent SQL injection, but this is less secure than parameter
+  /// binding used for non-string types.
+  ///
+  /// See [_execStatement] documentation for more details on the workaround.
   (String query, List<dynamic> params) _substituteStringParams(
     String query,
     List<dynamic> params,
@@ -315,32 +259,6 @@ extension on DartOdbcBlockingClient {
 
     final substituted = buffer.toString();
 
-    // #region agent log
-    try {
-      File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
-          .writeAsStringSync(
-        '${jsonEncode({
-              'sessionId': 'debug-session',
-              'runId': 'run1',
-              'hypothesisId': 'J',
-              'location': 'execute.dart:_substituteStringParams',
-              'message': 'String parameter substitution',
-              'data': {
-                'originalQuery': query,
-                'substitutedQuery': substituted,
-                'paramsCount': params.length,
-                'stringParamsCount': params.whereType<String>().length,
-                'remainingParamsCount': remainingParams.length,
-                'timestamp': DateTime.now().millisecondsSinceEpoch,
-              },
-            })}\n',
-        mode: FileMode.append,
-      );
-    } on Exception {
-      // Ignore logging errors
-    }
-    // #endregion
-
     return (substituted, remainingParams);
   }
 
@@ -348,5 +266,32 @@ extension on DartOdbcBlockingClient {
   /// Replaces single quotes with two single quotes (SQL standard)
   String _escapeSqlString(String value) {
     return value.replaceAll("'", "''");
+  }
+
+  /// Validates that all parameters are of supported types.
+  ///
+  /// Supported types: int, double, String, bool, DateTime, Uint8List, null.
+  /// Throws [QueryException] if any parameter has an unsupported type.
+  void _validateParams(List<dynamic> params) {
+    for (var i = 0; i < params.length; i++) {
+      final param = params[i];
+      final type = param.runtimeType;
+
+      final isSupported = param == null ||
+          param is int ||
+          param is double ||
+          param is String ||
+          param is bool ||
+          param is DateTime ||
+          param is Uint8List;
+
+      if (!isSupported) {
+        throw QueryException()
+          ..message =
+              'Unsupported parameter type at index $i: $type. '
+              'Supported types are: int, double, String, bool, DateTime, '
+              'Uint8List, or null.';
+      }
+    }
   }
 }

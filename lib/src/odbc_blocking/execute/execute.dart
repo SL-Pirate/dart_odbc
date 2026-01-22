@@ -69,6 +69,11 @@ extension on DartOdbcBlockingClient {
             : nullptr;
         strLenPointers.add(pStrLen);
 
+        final columnSize = OdbcConversions.getColumnSizeFromValue(
+          param,
+          param.runtimeType,
+        );
+
         _tryOdbc(
           _sql.SQLBindParameter(
             hStmt,
@@ -76,7 +81,7 @@ extension on DartOdbcBlockingClient {
             SQL_PARAM_INPUT,
             OdbcConversions.getCtypeFromType(param.runtimeType),
             OdbcConversions.getSqlTypeFromType(param.runtimeType),
-            0,
+            columnSize,
             OdbcConversions.getDecimalDigitsFromType(
               param.runtimeType,
             ),

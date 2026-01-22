@@ -18,7 +18,9 @@ void main() {
     await Future<void>.delayed(const Duration(seconds: 10));
 
     // Cleanup
-    await imageFile.delete();
+    if (await imageFile.exists()) {
+      await imageFile.delete();
+    }
   });
 
   test(

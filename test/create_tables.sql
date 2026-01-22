@@ -1,0 +1,27 @@
+-- Script para criar as tabelas no banco odbc_test
+-- Execute este script após criar o banco de dados odbc_test
+
+USE odbc_test;
+
+CREATE TABLE USERS (
+    UID INT NOT NULL PRIMARY KEY,
+    NAME NVARCHAR(150) NOT NULL,
+    DESCRIPTION NVARCHAR(500) NULL,
+    BIRTHDAY DATE NULL
+);
+
+INSERT INTO USERS (UID, NAME, DESCRIPTION, BIRTHDAY)
+VALUES
+    (1, 'Alice', NULL, '1999.05.12'),
+    (2, 'Bob', NULL, '2000.12.05');
+
+
+CREATE TABLE BINARY_TABLE (
+    id INT NOT NULL PRIMARY KEY,
+    data VARBINARY(100) NOT NULL
+);
+
+INSERT INTO BINARY_TABLE (id, data)
+VALUES
+    (1, 0x010203040506),
+    (2, 0xDEADBEEF);

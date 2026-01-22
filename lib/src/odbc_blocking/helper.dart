@@ -82,6 +82,33 @@ class OdbcConversions {
     return 0;
   }
 
+  /// Function to get the ColumnSize (precision) for SQLBindParameter
+  /// This is the maximum number of characters/bytes for the parameter
+  /// Based on ODBC and SQL Server specifications
+  /// Note: Version 6.0.1 removed ColumnSize, but SQL Server Native Client 11.0
+  /// requires it for some parameter types
+  static int getColumnSizeFromValue(dynamic value, Type type) {
+    if (type == String) {
+      // For SQL_WVARCHAR, ColumnSize is the maximum number of characters
+      // Use actual string length (in characters, not bytes)
+      final strLength = (value as String).length;
+      return strLength > 0 ? strLength : 1;
+    } else if (type == Uint8List || type == List) {
+      // For SQL_BINARY/VARBINARY, ColumnSize is the maximum number of bytes
+      final binLength = (value as Uint8List).length;
+      return binLength > 0 ? binLength : 1;
+    } else if (type == DateTime) {
+      // For SQL_TIMESTAMP, ColumnSize is 23 (YYYY-MM-DD HH:MM:SS.FFFFFF)
+      return 23;
+    }
+
+    // For numeric types (int, double, bool), return 0
+    // The driver should use appropriate defaults, but SQL Server Native Client 11.0
+    // may require explicit values. If 0 doesn't work, try using the actual value size
+    // For now, return 0 and let the driver decide
+    return 0;
+  }
+
   /// Convert dart type to a pointer
   static OdbcPointer toPointer(dynamic value) {
     if (value is String) {

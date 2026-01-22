@@ -37,6 +37,10 @@ class OdbcIsolateClient extends IsolateClient {
   /// Next cursor ID
   int _nextCursorId = 0;
 
+  /// Maximum number of cursors allowed simultaneously
+  /// Prevents memory exhaustion from too many open cursors
+  static const int maxCursors = 100;
+
   @override
   Future<void> initialize() async {
     await super.initialize();
@@ -143,6 +147,12 @@ class OdbcIsolateClient extends IsolateClient {
         return ResponsePayload(result);
 
       case OdbcCommand.executeCursor:
+        if (_cursors.length >= maxCursors) {
+          throw StateError(
+            'Maximum number of cursors ($maxCursors) reached. '
+            'Close existing cursors before creating new ones.',
+          );
+        }
         return _executeCursor(
           message.arguments['query'] as String,
           message.arguments['params'] as List<dynamic>?,
@@ -161,9 +171,13 @@ class OdbcIsolateClient extends IsolateClient {
         final cursorId = message.arguments['cursorId'] as int;
         final cursor = _cursors.remove(cursorId);
         if (cursor == null) {
-          _log.warning('Cursor with ID $cursorId not found for closing.');
+          _log.warning(
+            'Cursor with ID $cursorId not found for closing. '
+            'It may have already been closed or never existed.',
+          );
         } else {
           await cursor.close();
+          _log.fine('Cursor with ID $cursorId closed successfully.');
         }
         return ResponsePayload();
 
@@ -192,6 +206,11 @@ class OdbcIsolateClient extends IsolateClient {
     final cursor = await _odbc.executeCursor(query, params: params);
     final cursorId = _nextCursorId++;
     _cursors[cursorId] = cursor;
+
+    _log.fine(
+      'Cursor created with ID $cursorId. '
+      'Total cursors: ${_cursors.length}/$maxCursors',
+    );
 
     return ResponsePayload(cursorId);
   }

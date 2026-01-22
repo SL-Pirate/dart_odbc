@@ -45,6 +45,7 @@ Future<void> run(List<String> args) async {
     params: args.sublist(1), // <-- SQL query parameters
   );
 
+  // ignore: avoid_print
   print(result);
 
   // finally disconnect from the db

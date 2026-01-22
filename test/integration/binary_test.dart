@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:open_url/open_url.dart';
 import 'package:test/test.dart';
 
 import '../test_helper.dart';
@@ -14,11 +13,8 @@ void main() {
 
   tearDownAll(helper.disconnect);
   tearDownAll(() async {
-    // Give user time to see it
-    await Future<void>.delayed(const Duration(seconds: 10));
-
     // Cleanup
-    if (await imageFile.exists()) {
+    if (imageFile.existsSync()) {
       await imageFile.delete();
     }
   });
@@ -38,7 +34,8 @@ void main() {
       // Write image to disk
       await imageFile.writeAsBytes(bytes);
 
-      await openUrl(imageFile.path);
+      // Image is written to disk for verification
+      // To view it manually, open test.png in an image viewer
     },
   );
 }

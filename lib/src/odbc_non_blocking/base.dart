@@ -23,6 +23,7 @@ class DartOdbc implements IDartOdbc {
   Future<void> connect({
     required String username,
     required String password,
+    bool encrypt = true,
   }) async {
     if (_isolateClient != null) {
       await _isolateClient!.close();
@@ -39,6 +40,7 @@ class DartOdbc implements IDartOdbc {
         {
           'username': username,
           'password': password,
+          'encrypt': encrypt,
         },
       ),
     );
@@ -118,6 +120,101 @@ class DartOdbc implements IDartOdbc {
     if (response is ErrorPayload) {
       _logStackTrace(response.stackTrace);
       throw ODBCException('Error executing query: ${response.data}');
+    }
+
+    return _getQueryDataFromResponse(response);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getColumns({
+    required String tableName,
+    String? catalog,
+    String? schema,
+    String? columnName,
+  }) async {
+    if (_isolateClient == null) {
+      throw ODBCException('Not connected to any database.');
+    }
+
+    final response = await _isolateClient!.request(
+      RequestPayload(
+        OdbcCommand.getColumns.name,
+        {
+          'tableName': tableName,
+          'catalog': catalog,
+          'schema': schema,
+          'columnName': columnName,
+        },
+      ),
+    );
+
+    if (response is ErrorPayload) {
+      _logStackTrace(response.stackTrace);
+      throw ODBCException('Error getting columns: ${response.data}');
+    }
+
+    return _getQueryDataFromResponse(response);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getPrimaryKeys({
+    required String tableName,
+    String? catalog,
+    String? schema,
+  }) async {
+    if (_isolateClient == null) {
+      throw ODBCException('Not connected to any database.');
+    }
+
+    final response = await _isolateClient!.request(
+      RequestPayload(
+        OdbcCommand.getPrimaryKeys.name,
+        {
+          'tableName': tableName,
+          'catalog': catalog,
+          'schema': schema,
+        },
+      ),
+    );
+
+    if (response is ErrorPayload) {
+      _logStackTrace(response.stackTrace);
+      throw ODBCException('Error getting primary keys: ${response.data}');
+    }
+
+    return _getQueryDataFromResponse(response);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getForeignKeys({
+    String? pkTableName,
+    String? fkTableName,
+    String? pkCatalog,
+    String? pkSchema,
+    String? fkCatalog,
+    String? fkSchema,
+  }) async {
+    if (_isolateClient == null) {
+      throw ODBCException('Not connected to any database.');
+    }
+
+    final response = await _isolateClient!.request(
+      RequestPayload(
+        OdbcCommand.getForeignKeys.name,
+        {
+          'pkTableName': pkTableName,
+          'fkTableName': fkTableName,
+          'pkCatalog': pkCatalog,
+          'pkSchema': pkSchema,
+          'fkCatalog': fkCatalog,
+          'fkSchema': fkSchema,
+        },
+      ),
+    );
+
+    if (response is ErrorPayload) {
+      _logStackTrace(response.stackTrace);
+      throw ODBCException('Error getting foreign keys: ${response.data}');
     }
 
     return _getQueryDataFromResponse(response);

@@ -47,8 +47,9 @@ Future<void> _getAndPrintSheetsWithData(DartOdbc odbc) async {
     _printPrettyJson(sheet);
   }
 
-  final sheetNames =
-      sheets.map((sheet) => sheet["TABLE_NAME"] as String).toList();
+  final sheetNames = sheets
+      .map((sheet) => sheet["TABLE_NAME"] as String)
+      .toList();
 
   for (final sheet in sheetNames) {
     stdout.writeln("\n\nSheet $sheet:");
@@ -75,10 +76,7 @@ Future<String> _resolveFilePath(String path) async {
   final file = File(path);
 
   if (!file.existsSync()) {
-    throw FileSystemException(
-      "Database file not found",
-      p.absolute(path),
-    );
+    throw FileSystemException("Database file not found", p.absolute(path));
   }
 
   return file.absolute.path;

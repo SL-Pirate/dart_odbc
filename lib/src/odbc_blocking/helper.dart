@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dart_odbc/src/libodbcext.dart';
 import 'package:ffi/ffi.dart';
@@ -53,12 +55,59 @@ class OdbcConversions {
 
   /// Function to get the SQL type from a Dart type
   static int getSqlTypeFromType(Type type) {
+    // #region agent log
+    try {
+      File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+          .writeAsStringSync(
+        '${jsonEncode({
+              'sessionId': 'debug-session',
+              'runId': 'run1',
+              'hypothesisId': 'C',
+              'location': 'helper.dart:getSqlTypeFromType',
+              'message': 'Getting SQL type from Dart type',
+              'data': {
+                'dartType': type.toString(),
+                'timestamp': DateTime.now().millisecondsSinceEpoch,
+              },
+            })}\n',
+        mode: FileMode.append,
+      );
+    } on Exception {
+      // Ignore logging errors
+    }
+    // #endregion
+
     if (type == int) {
       return SQL_INTEGER;
     } else if (type == double) {
       return SQL_DOUBLE;
     } else if (type == String) {
-      return SQL_WVARCHAR;
+      // Use SQL_WVARCHAR with actual ColumnSize matching string length
+      // Testing if this works with proper ColumnSize/BufferLength relationship
+      const sqlType = SQL_WVARCHAR;
+      // #region agent log
+      try {
+        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+            .writeAsStringSync(
+          '${jsonEncode({
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'C',
+                'location': 'helper.dart:getSqlTypeFromType',
+                'message': 'Returning SQL type for String',
+                'data': {
+                  'sqlType': sqlType,
+                  'sqlTypeName': 'SQL_WVARCHAR',
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                },
+              })}\n',
+          mode: FileMode.append,
+        );
+      } on Exception {
+        // Ignore logging errors
+      }
+      // #endregion
+      return sqlType;
     } else if (type == bool) {
       return SQL_BIT;
     } else if (type == DateTime) {
@@ -85,14 +134,63 @@ class OdbcConversions {
   /// Function to get the ColumnSize (precision) for SQLBindParameter
   /// This is the maximum number of characters/bytes for the parameter
   /// Based on ODBC and SQL Server specifications
-  /// Note: Version 6.0.1 removed ColumnSize, but SQL Server Native Client 11.0
-  /// requires it for some parameter types
+  /// Using actual string length to avoid HY104 errors
   static int getColumnSizeFromValue(dynamic value, Type type) {
+    // #region agent log
+    try {
+      File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+          .writeAsStringSync(
+        '${jsonEncode({
+              'sessionId': 'debug-session',
+              'runId': 'run1',
+              'hypothesisId': 'A',
+              'location': 'helper.dart:getColumnSizeFromValue',
+              'message': 'Getting ColumnSize from value',
+              'data': {
+                'dartType': type.toString(),
+                'valueType': value.runtimeType.toString(),
+                'isString': value is String,
+                'stringLength': value is String ? value.length : null,
+                'timestamp': DateTime.now().millisecondsSinceEpoch,
+              },
+            })}\n',
+        mode: FileMode.append,
+      );
+    } on Exception {
+      // Ignore logging errors
+    }
+    // #endregion
+
     if (type == String) {
       // For SQL_WVARCHAR, ColumnSize is the maximum number of characters
-      // Use actual string length (in characters, not bytes)
-      final strLength = (value as String).length;
-      return strLength > 0 ? strLength : 1;
+      // ODBC Driver 18 may require ColumnSize to match actual string length
+      final stringValue = value as String;
+      final length = stringValue.length;
+      // ColumnSize in characters (not including null terminator)
+      final columnSize = length > 0 ? length : 1;
+      // #region agent log
+      try {
+        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+            .writeAsStringSync(
+          '${jsonEncode({
+                'sessionId': 'debug-session',
+                'runId': 'post-fix',
+                'hypothesisId': 'B',
+                'location': 'helper.dart:getColumnSizeFromValue',
+                'message': 'Returning ColumnSize for String (FIXED)',
+                'data': {
+                  'columnSize': columnSize,
+                  'actualStringLength': stringValue.length,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                },
+              })}\n',
+          mode: FileMode.append,
+        );
+      } on Exception {
+        // Ignore logging errors
+      }
+      // #endregion
+      return columnSize;
     } else if (type == Uint8List || type == List) {
       // For SQL_BINARY/VARBINARY, ColumnSize is the maximum number of bytes
       final binLength = (value as Uint8List).length;
@@ -103,19 +201,43 @@ class OdbcConversions {
     }
 
     // For numeric types (int, double, bool), return 0
-    // The driver should use appropriate defaults, but SQL Server Native Client 11.0
-    // may require explicit values. If 0 doesn't work, try using the actual value size
-    // For now, return 0 and let the driver decide
+    // The driver should use appropriate defaults
     return 0;
   }
 
   /// Convert dart type to a pointer
+  /// For strings, this will be adjusted in execute.dart to match requirements
   static OdbcPointer toPointer(dynamic value) {
     if (value is String) {
       final result = value.toNativeUtf16();
+      final bufferSize = result.length * sizeOf<Uint16>();
+      // #region agent log
+      try {
+        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+            .writeAsStringSync(
+          '${jsonEncode({
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'F',
+                'location': 'helper.dart:toPointer',
+                'message': 'Allocating buffer for string',
+                'data': {
+                  'stringValue': value,
+                  'stringLength': value.length,
+                  'bufferSizeBytes': bufferSize,
+                  'resultLength': result.length,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                },
+              })}\n',
+          mode: FileMode.append,
+        );
+      } on Exception {
+        // Ignore logging errors
+      }
+      // #endregion
       return OdbcPointer<Utf16>(
         result.cast(),
-        result.length * sizeOf<Uint16>(),
+        bufferSize,
         value: value,
       );
     } else if (value is int) {
@@ -223,4 +345,25 @@ bool isSQLTypeBinary(int type) {
   return type == SQL_BINARY ||
       type == SQL_VARBINARY ||
       type == SQL_LONGVARBINARY;
+}
+
+/// Check if the SQL type is a date/time type
+bool isSQLTypeDateTime(int type) {
+  return type == SQL_TYPE_DATE || // 91
+      type == SQL_TYPE_TIME || // 92
+      type == SQL_TYPE_TIMESTAMP || // 93
+      type == SQL_DATETIME; // 9 (legacy)
+}
+
+/// Convert tagTIMESTAMP_STRUCT to Dart DateTime
+DateTime fromTimestampValue(tagTIMESTAMP_STRUCT timestamp) {
+  return DateTime(
+    timestamp.year,
+    timestamp.month,
+    timestamp.day,
+    timestamp.hour,
+    timestamp.minute,
+    timestamp.second,
+    timestamp.fraction ~/ 1000,
+  );
 }

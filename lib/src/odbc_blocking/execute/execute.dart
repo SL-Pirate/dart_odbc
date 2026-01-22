@@ -43,10 +43,59 @@ extension on DartOdbcBlockingClient {
     // hstatement will be freed by the cursor
     final hStmt = pHStmt.value;
 
-    final cQuery = query.toNativeUtf16();
+    // WORKAROUND for ODBC Driver 18 HY104 issue
+    // String params use SQLExecDirectW, others use prepared statements
+    final hasStringParams = params != null && params.any((p) => p is String);
 
-    // binding sanitized params
-    if (params != null) {
+    String finalQuery;
+    List<dynamic>? remainingParams;
+
+    if (hasStringParams) {
+      // Replace string parameters directly in query with escaped values
+      // Keep non-string parameters for binding
+      final (substitutedQuery, nonStringParams) = _substituteStringParams(
+        query,
+        // hasStringParams guarantees params != null, but analyzer can't see it
+        // ignore: unnecessary_non_null_assertion
+        params!,
+      );
+      finalQuery = substitutedQuery;
+      remainingParams = nonStringParams.isEmpty ? null : nonStringParams;
+
+      // #region agent log
+      try {
+        File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+            .writeAsStringSync(
+          '${jsonEncode({
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'J',
+                'location': 'execute.dart:_execStatement',
+                'message': 'Using SQLExecDirectW workaround for string params',
+                'data': {
+                  'originalQuery': query,
+                  'finalQuery': finalQuery,
+                  'hasStringParams': true,
+                  'remainingParamsCount': remainingParams?.length ?? 0,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                },
+              })}\n',
+          mode: FileMode.append,
+        );
+      } on Exception {
+        // Ignore logging errors
+      }
+      // #endregion
+    } else {
+      // No string parameters, use normal prepared statement flow
+      finalQuery = query;
+      remainingParams = params;
+    }
+
+    final cQuery = finalQuery.toNativeUtf16();
+
+    // binding sanitized params (only non-string params if workaround was used)
+    if (remainingParams != null) {
       _tryOdbc(
         _sql.SQLPrepareW(hStmt, cQuery.cast(), SQL_NTS),
         handle: hStmt,
@@ -59,36 +108,114 @@ extension on DartOdbcBlockingClient {
         },
       );
 
-      for (var i = 0; i < params.length; i++) {
-        final param = params[i];
-        final cParam = OdbcConversions.toPointer(param);
+      for (var i = 0; i < remainingParams.length; i++) {
+        final param = remainingParams[i];
 
-        // if the param is a string or binary data, set the length pointer
-        final pStrLen = cParam.actualSize != null
-            ? (calloc<SQLLEN>()..value = cParam.actualSize!)
-            : nullptr;
-        strLenPointers.add(pStrLen);
-
+        // Standard parameter binding for non-string types
+        // String parameters were already substituted in the query
         final columnSize = OdbcConversions.getColumnSizeFromValue(
           param,
           param.runtimeType,
         );
 
+        final cParam = OdbcConversions.toPointer(param);
+
+        // For strings, use SQL_NTS since buffer is null-terminated
+        // For other types, use actualSize or nullptr
+        final pStrLen = param is String
+            ? (calloc<SQLLEN>()..value = SQL_NTS)
+            : (cParam.actualSize != null
+                ? (calloc<SQLLEN>()..value = cParam.actualSize!)
+                : nullptr);
+        strLenPointers.add(pStrLen);
+
+        // BufferLength is the size of the allocated buffer in bytes
+        // For strings with SQL_NTS, BufferLength should NOT include the null
+        // terminator toNativeUtf16() includes null terminator, so subtract it
+        final bufferLength = param is String
+            ? cParam.length - sizeOf<Uint16>()
+            : cParam.length;
+
+        final cType = OdbcConversions.getCtypeFromType(param.runtimeType);
+        final sqlType = OdbcConversions.getSqlTypeFromType(param.runtimeType);
+        final decimalDigits = OdbcConversions.getDecimalDigitsFromType(
+          param.runtimeType,
+        );
+
+        // #region agent log
+        try {
+          File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+              .writeAsStringSync(
+            '${jsonEncode({
+                  'sessionId': 'debug-session',
+                  'runId': 'run1',
+                  'hypothesisId': 'A,B,C,D,E',
+                  'location': 'execute.dart:_execStatement',
+                  'message': 'Before SQLBindParameter call',
+                  'data': {
+                    'paramIndex': i + 1,
+                    'paramType': param.runtimeType.toString(),
+                    'paramValue': param is String ? param : param.toString(),
+                    'paramLength': param is String ? param.length : null,
+                    'cType': cType,
+                    'sqlType': sqlType,
+                    'columnSize': columnSize,
+                    'decimalDigits': decimalDigits,
+                    'bufferLength': bufferLength,
+                    'strLenValue': pStrLen != nullptr ? pStrLen.value : null,
+                    'isSQL_NTS': false,
+                    'strLenBytes': param is String
+                        ? param.length * sizeOf<Uint16>()
+                        : null,
+                    'timestamp': DateTime.now().millisecondsSinceEpoch,
+                  },
+                })}\n',
+            mode: FileMode.append,
+          );
+        } on Exception {
+          // Ignore logging errors
+        }
+        // #endregion
+
+        final bindResult = _sql.SQLBindParameter(
+          hStmt,
+          i + 1,
+          SQL_PARAM_INPUT,
+          cType,
+          sqlType,
+          columnSize,
+          decimalDigits,
+          cParam.ptr,
+          bufferLength,
+          pStrLen,
+        );
+
+        // #region agent log
+        try {
+          File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+              .writeAsStringSync(
+            '${jsonEncode({
+                  'sessionId': 'debug-session',
+                  'runId': 'run1',
+                  'hypothesisId': 'A,B,C,D,E',
+                  'location': 'execute.dart:_execStatement',
+                  'message': 'After SQLBindParameter call',
+                  'data': {
+                    'paramIndex': i + 1,
+                    'bindResult': bindResult,
+                    'isSuccess': bindResult >= 0,
+                    'timestamp': DateTime.now().millisecondsSinceEpoch,
+                  },
+                })}\n',
+            mode: FileMode.append,
+          );
+        } on Exception {
+          // Ignore logging errors
+        }
+        // #endregion
+
         _tryOdbc(
-          _sql.SQLBindParameter(
-            hStmt,
-            i + 1,
-            SQL_PARAM_INPUT,
-            OdbcConversions.getCtypeFromType(param.runtimeType),
-            OdbcConversions.getSqlTypeFromType(param.runtimeType),
-            columnSize,
-            OdbcConversions.getDecimalDigitsFromType(
-              param.runtimeType,
-            ),
-            cParam.ptr,
-            cParam.length,
-            pStrLen,
-          ),
+          bindResult,
           handle: hStmt,
           beforeThrow: () {
             calloc
@@ -108,7 +235,9 @@ extension on DartOdbcBlockingClient {
       }
     }
 
-    if (params == null) {
+    // If workaround was used (hasStringParams), use SQLExecDirectW directly
+    // Otherwise, use prepared statement flow
+    if (hasStringParams || remainingParams == null) {
       _tryOdbc(
         _sql.SQLExecDirectW(hStmt, cQuery.cast(), SQL_NTS),
         handle: hStmt,
@@ -146,5 +275,78 @@ extension on DartOdbcBlockingClient {
       ..free(pHStmt);
 
     return hStmt;
+  }
+
+  /// Substitute string parameters directly in query with escaped values
+  /// Returns the substituted query and list of remaining non-string parameters
+  /// Workaround for ODBC Driver 18 HY104 issue with string parameter binding
+  (String query, List<dynamic> params) _substituteStringParams(
+    String query,
+    List<dynamic> params,
+  ) {
+    if (params.isEmpty) {
+      return (query, []);
+    }
+
+    final remainingParams = <dynamic>[];
+    final buffer = StringBuffer();
+    var paramIndex = 0;
+    var queryIndex = 0;
+
+    while (queryIndex < query.length) {
+      if (query[queryIndex] == '?' && paramIndex < params.length) {
+        final param = params[paramIndex];
+        if (param is String) {
+          // Substitute string parameter with escaped value
+          final escapedValue = _escapeSqlString(param);
+          buffer.write("'$escapedValue'");
+        } else {
+          // Keep non-string parameters as placeholders for binding
+          buffer.write('?');
+          remainingParams.add(param);
+        }
+        paramIndex++;
+        queryIndex++;
+      } else {
+        buffer.write(query[queryIndex]);
+        queryIndex++;
+      }
+    }
+
+    final substituted = buffer.toString();
+
+    // #region agent log
+    try {
+      File(r'd:\Developer\Flutter\dart_odbc\.cursor\debug.log')
+          .writeAsStringSync(
+        '${jsonEncode({
+              'sessionId': 'debug-session',
+              'runId': 'run1',
+              'hypothesisId': 'J',
+              'location': 'execute.dart:_substituteStringParams',
+              'message': 'String parameter substitution',
+              'data': {
+                'originalQuery': query,
+                'substitutedQuery': substituted,
+                'paramsCount': params.length,
+                'stringParamsCount': params.whereType<String>().length,
+                'remainingParamsCount': remainingParams.length,
+                'timestamp': DateTime.now().millisecondsSinceEpoch,
+              },
+            })}\n',
+        mode: FileMode.append,
+      );
+    } on Exception {
+      // Ignore logging errors
+    }
+    // #endregion
+
+    return (substituted, remainingParams);
+  }
+
+  /// Escape SQL string to prevent SQL injection
+  /// Replaces single quotes with two single quotes (SQL standard)
+  String _escapeSqlString(String value) {
+    return value.replaceAll("'", "''");
   }
 }

@@ -84,6 +84,7 @@ class OdbcIsolateClient extends IsolateClient {
         await _odbc.connect(
           username: message.arguments['username'] as String,
           password: message.arguments['password'] as String,
+          encrypt: message.arguments['encrypt'] as bool? ?? true,
         );
         await _clearCursors(); // for sanity
         return ResponsePayload();
@@ -103,6 +104,34 @@ class OdbcIsolateClient extends IsolateClient {
           catalog: message.arguments['catalog'] as String?,
           schema: message.arguments['schema'] as String?,
           tableType: message.arguments['tableType'] as String?,
+        );
+        return ResponsePayload(result);
+
+      case OdbcCommand.getColumns:
+        final result = await _odbc.getColumns(
+          tableName: message.arguments['tableName'] as String,
+          catalog: message.arguments['catalog'] as String?,
+          schema: message.arguments['schema'] as String?,
+          columnName: message.arguments['columnName'] as String?,
+        );
+        return ResponsePayload(result);
+
+      case OdbcCommand.getPrimaryKeys:
+        final result = await _odbc.getPrimaryKeys(
+          tableName: message.arguments['tableName'] as String,
+          catalog: message.arguments['catalog'] as String?,
+          schema: message.arguments['schema'] as String?,
+        );
+        return ResponsePayload(result);
+
+      case OdbcCommand.getForeignKeys:
+        final result = await _odbc.getForeignKeys(
+          pkTableName: message.arguments['pkTableName'] as String?,
+          fkTableName: message.arguments['fkTableName'] as String?,
+          pkCatalog: message.arguments['pkCatalog'] as String?,
+          pkSchema: message.arguments['pkSchema'] as String?,
+          fkCatalog: message.arguments['fkCatalog'] as String?,
+          fkSchema: message.arguments['fkSchema'] as String?,
         );
         return ResponsePayload(result);
 
@@ -209,6 +238,15 @@ enum OdbcCommand {
 
   /// Get tables command
   getTables,
+
+  /// Get columns command
+  getColumns,
+
+  /// Get primary keys command
+  getPrimaryKeys,
+
+  /// Get foreign keys command
+  getForeignKeys,
 
   /// Execute query command
   execute,

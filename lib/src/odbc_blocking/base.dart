@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:ffi/ffi.dart';
@@ -11,6 +13,9 @@ part 'handler.dart';
 part 'connection.dart';
 part 'execute/execute.dart';
 part 'execute/get_tables.dart';
+part 'execute/get_columns.dart';
+part 'execute/get_primary_keys.dart';
+part 'execute/get_foreign_keys.dart';
 
 /// DartOdbc class
 /// This is the base class that will be used to interact with the ODBC driver.
@@ -48,11 +53,24 @@ class DartOdbcBlockingClient implements IDartOdbc {
   Future<void> connect({
     required String username,
     required String password,
+    bool encrypt = true,
   }) async {
-    await _connect(
-      username: username,
-      password: password,
-    );
+    if (!encrypt && _dsn != null) {
+      // When encryption is disabled, use connection string with Encrypt=no
+      final connectionString = [
+        'DSN=$_dsn',
+        'UID=$username',
+        'PWD=$password',
+        'Encrypt=no',
+        'TrustServerCertificate=yes',
+      ].join(';');
+      await _connectWithConnectionString(connectionString);
+    } else {
+      await _connect(
+        username: username,
+        password: password,
+      );
+    }
   }
 
   @override
@@ -72,6 +90,53 @@ class DartOdbcBlockingClient implements IDartOdbc {
       catalog: catalog,
       schema: schema,
       tableType: tableType,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getColumns({
+    required String tableName,
+    String? catalog,
+    String? schema,
+    String? columnName,
+  }) async {
+    return _getColumns(
+      tableName: tableName,
+      catalog: catalog,
+      schema: schema,
+      columnName: columnName,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getPrimaryKeys({
+    required String tableName,
+    String? catalog,
+    String? schema,
+  }) async {
+    return _getPrimaryKeys(
+      tableName: tableName,
+      catalog: catalog,
+      schema: schema,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getForeignKeys({
+    String? pkTableName,
+    String? fkTableName,
+    String? pkCatalog,
+    String? pkSchema,
+    String? fkCatalog,
+    String? fkSchema,
+  }) async {
+    return _getForeignKeys(
+      pkTableName: pkTableName,
+      fkTableName: fkTableName,
+      pkCatalog: pkCatalog,
+      pkSchema: pkSchema,
+      fkCatalog: fkCatalog,
+      fkSchema: fkSchema,
     );
   }
 

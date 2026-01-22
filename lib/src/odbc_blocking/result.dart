@@ -193,6 +193,35 @@ class _OdbcCursorImpl implements OdbcCursor {
         } else {
           row[columnNames[i - 1]] = Uint8List.fromList(collected);
         }
+      } else if (columnType != null && isSQLTypeDateTime(columnType)) {
+        final timestampBuffer = calloc<tagTIMESTAMP_STRUCT>();
+
+        try {
+          tryOdbc(
+            sql.SQLGetData(
+              hStmt,
+              i,
+              SQL_C_TYPE_TIMESTAMP,
+              timestampBuffer.cast(),
+              sizeOf<tagTIMESTAMP_STRUCT>(),
+              pColumnValueLength,
+            ),
+            handle: hStmt,
+            onException: FetchException(),
+            beforeThrow: () {
+              calloc.free(timestampBuffer);
+              _close();
+            },
+          );
+
+          if (pColumnValueLength.value == SQL_NULL_DATA) {
+            row[columnNames[i - 1]] = null;
+          } else {
+            row[columnNames[i - 1]] = fromTimestampValue(timestampBuffer.ref);
+          }
+        } finally {
+          calloc.free(timestampBuffer);
+        }
       } else {
         final collectedUnits = <int>[];
 

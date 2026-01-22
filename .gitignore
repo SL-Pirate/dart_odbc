@@ -22,6 +22,9 @@ test.env
 # temporary file created by tests
 test.png
 
+# local test files
+test/my_test/
+
 # temporary files
 SECURITY_REVIEW.md
 

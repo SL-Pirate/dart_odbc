@@ -21,10 +21,11 @@ class LibOdbcExt extends LibOdbc {
   ) {
     try {
       return super.SQLAllocHandle(HandleType, InputHandle, OutputHandle);
-    } catch (e) {
+    } catch (e, st) {
       _log.severe(
         'Error allocating ODBC handle of type $HandleType!. Trying fallback.',
         e,
+        st,
       );
 
       if (HandleType == SQL_HANDLE_DBC) {

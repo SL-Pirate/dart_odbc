@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 
 import 'package:dart_odbc/src/worker/message.dart';
+import 'package:logging/logging.dart';
 
 /// Client for communicating with a worker isolate.
 abstract class IsolateClient {
@@ -9,6 +10,9 @@ abstract class IsolateClient {
   IsolateClient() {
     _ready = initialize();
   }
+
+  /// Logger for error logging in worker isolate
+  static final _log = Logger('IsolateClient');
 
   late final Future<void> _ready;
   late final Isolate _isolate;
@@ -141,6 +145,13 @@ abstract class IsolateClient {
           ).toMap(),
         );
       } on Object catch (e, st) {
+        // Log error in worker isolate before sending to main isolate
+        _log.severe(
+          'Error in worker isolate handling message ${msg.id}',
+          e,
+          st,
+        );
+
         mainSendPort.send(
           WorkerMessage(
             id: msg.id,

@@ -224,6 +224,9 @@ class OdbcPointer<T extends NativeType> {
 /// default Buffer size (match OS page size)
 const defaultBufferSize = 4096;
 
+/// default maximum Buffer size for adaptive expansion
+const defaultMaxBufferSize = 65536; // 64KB
+
 /// SQL state string length (SQL_STATE_LENGTH)
 const sqlStateLength = 6;
 

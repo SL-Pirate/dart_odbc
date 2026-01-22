@@ -65,7 +65,7 @@ extension on DartOdbcBlockingClient {
     _hConn = pHConn.value;
 
     final cConnectionString = connectionString.toNativeUtf16();
-    final outChars = defaultBufferSize ~/ sizeOf<Uint16>();
+    final outChars = _bufferSize ~/ sizeOf<Uint16>();
     final pOutConnectionString = calloc<Uint16>(outChars);
     final pOutConnectionStringLen = calloc<Short>();
 

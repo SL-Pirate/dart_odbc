@@ -22,7 +22,9 @@ class Helper {
 
   Future<void> initialize({bool blocking = false}) async {
     env = DotEnv()..load(['.env']);
-    odbc = blocking ? DartOdbcBlockingClient() : DartOdbc(dsn: dsn);
+    odbc = blocking
+        ? DartOdbcBlockingClient(dsn: env['DSN'])
+        : DartOdbc(dsn: env['DSN']);
     _log.info("Initialized ${blocking ? 'blocking' : 'non blocking'} client");
 
     final connectionString = [
@@ -57,6 +59,9 @@ class Helper {
     String sql, {
     List<dynamic> params = const [],
   }) {
+    // Parameters are automatically validated before execution
+    // Supported types: int, double, String, bool, DateTime, Uint8List, null
+    // QueryException is thrown for unsupported parameter types
     return odbc.execute(sql, params: params);
   }
 

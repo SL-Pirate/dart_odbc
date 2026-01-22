@@ -25,16 +25,63 @@ class DartOdbcBlockingClient implements IDartOdbc {
   /// the driver will be auto-detected from the ODBC.ini file.
   /// The [dsn] parameter is the name of the DSN to connect to.
   /// If [dsn] is not provided, only [connectWithConnectionString] can be used.
+  /// The [bufferSize] parameter sets the buffer size in bytes for reading data.
+  /// Default is 4096 (4KB). Increase this value for better performance with
+  /// large datasets, but be aware of memory constraints.
+  /// The [maxBufferSize] parameter sets the maximum buffer size for adaptive
+  /// expansion. Default is 65536 (64KB).
+  /// The [enableAdaptiveBuffer] parameter enables/disables automatic buffer
+  /// expansion when HY090 errors occur. Default is true.
   /// Definitions for these values can be found in the [LibOdbc] class.
   /// Please note that some drivers may not work with some drivers.
-  DartOdbcBlockingClient({String? dsn, String? pathToDriver})
-      : __sql = discoverDriver(pathToDriver),
-        _dsn = dsn {
+  DartOdbcBlockingClient({
+    String? dsn,
+    String? pathToDriver,
+    int? bufferSize,
+    int? maxBufferSize,
+    bool enableAdaptiveBuffer = true,
+  })  : __sql = discoverDriver(pathToDriver),
+        _dsn = dsn,
+        _bufferSize = _validateBufferSize(bufferSize ?? defaultBufferSize),
+        _maxBufferSize = _validateMaxBufferSize(
+          maxBufferSize ?? defaultMaxBufferSize,
+          bufferSize ?? defaultBufferSize,
+        ),
+        _enableAdaptiveBuffer = enableAdaptiveBuffer {
     _initialize();
+  }
+
+  /// Validates buffer size parameter
+  static int _validateBufferSize(int size) {
+    if (size <= 0) {
+      throw ArgumentError('bufferSize must be greater than 0, got: $size');
+    }
+    if (size > 1024 * 1024 * 1024) {
+      // 1GB limite razoável
+      throw ArgumentError('bufferSize too large: $size bytes (max: 1GB)');
+    }
+    return size;
+  }
+
+  /// Validates max buffer size parameter
+  static int _validateMaxBufferSize(int maxSize, int initialSize) {
+    if (maxSize < initialSize) {
+      throw ArgumentError(
+        'maxBufferSize ($maxSize) must be >= bufferSize ($initialSize)',
+      );
+    }
+    if (maxSize > 1024 * 1024 * 1024) {
+      // 1GB limite razoável
+      throw ArgumentError('maxBufferSize too large: $maxSize bytes (max: 1GB)');
+    }
+    return maxSize;
   }
 
   final LibOdbc? __sql;
   final String? _dsn;
+  final int _bufferSize;
+  final int _maxBufferSize;
+  final bool _enableAdaptiveBuffer;
   final Logger _log = Logger('DartOdbc');
   SQLHANDLE _hEnv = nullptr;
   SQLHDBC _hConn = nullptr;

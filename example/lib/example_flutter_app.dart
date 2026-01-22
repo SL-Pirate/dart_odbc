@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dart_odbc/dart_odbc.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -61,11 +62,25 @@ class _OdbcExampleAppState extends State<OdbcExampleApp> {
           _binaryData = binResult;
         });
       }
-    } catch (e) {
-      debugPrint('Error during ODBC operations: $e');
-
+    } on ConnectionException catch (e) {
+      debugPrint('Connection error: $e');
       if (mounted) {
-        setState(() => _error = e.toString());
+        setState(() => _error = 'Connection error: $e');
+      }
+    } on QueryException catch (e) {
+      debugPrint('Query error: $e');
+      if (mounted) {
+        setState(() => _error = 'Query error: $e');
+      }
+    } on FetchException catch (e) {
+      debugPrint('Fetch error: $e');
+      if (mounted) {
+        setState(() => _error = 'Fetch error: $e');
+      }
+    } catch (e) {
+      debugPrint('Unexpected error during ODBC operations: $e');
+      if (mounted) {
+        setState(() => _error = 'Unexpected error: $e');
       }
     } finally {
       // Clean up connection if needed, or keep it open for the session

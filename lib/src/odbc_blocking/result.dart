@@ -22,7 +22,13 @@ extension on DartOdbcBlockingClient {
   }
 
   OdbcCursor _getResult(SQLHSTMT hStmt) {
-    return _OdbcCursorImpl(odbc: this, hStmt: hStmt);
+    return _OdbcCursorImpl(
+      odbc: this,
+      hStmt: hStmt,
+      bufferSize: _bufferSize,
+      maxBufferSize: _maxBufferSize,
+      enableAdaptiveBuffer: _enableAdaptiveBuffer,
+    );
   }
 }
 
@@ -31,9 +37,16 @@ class _OdbcCursorImpl implements OdbcCursor {
   /// Constructor
   /// This constructor can throw [ODBCException] if there is an error
   /// while fetching the result set metadata.
-  _OdbcCursorImpl({required this.odbc, required this.hStmt})
-      : sql = odbc._sql,
-        tryOdbc = odbc._tryOdbc {
+  _OdbcCursorImpl({
+    required this.odbc,
+    required this.hStmt,
+    required this.bufferSize,
+    required this.maxBufferSize,
+    required this.enableAdaptiveBuffer,
+  })  : sql = odbc._sql,
+        tryOdbc = odbc._tryOdbc,
+        currentBufferSize = bufferSize,
+        buf = calloc.allocate(bufferSize) {
     tryOdbc(
       sql.SQLNumResultCols(hStmt, pColumnCount),
       handle: hStmt,
@@ -41,7 +54,7 @@ class _OdbcCursorImpl implements OdbcCursor {
       beforeThrow: _close,
     );
 
-    final columnNameCharSize = defaultBufferSize ~/ sizeOf<Uint16>();
+    final columnNameCharSize = bufferSize ~/ sizeOf<Uint16>();
     // allocating memory for column names
     // outside the loop to reduce overhead in memory allocation
     final pColumnNameLength = calloc<SQLSMALLINT>();
@@ -88,6 +101,10 @@ class _OdbcCursorImpl implements OdbcCursor {
 
   final DartOdbcBlockingClient odbc;
   SQLHSTMT hStmt;
+  final int bufferSize;
+  final int maxBufferSize;
+  final bool enableAdaptiveBuffer;
+  int currentBufferSize;
 
   final LibOdbc sql;
   final int Function(
@@ -104,11 +121,46 @@ class _OdbcCursorImpl implements OdbcCursor {
   // pointers
   Pointer<SQLSMALLINT> pColumnCount = calloc<SQLSMALLINT>();
   Pointer<SQLLEN> pColumnValueLength = calloc<SQLLEN>();
-  Pointer<Void> buf = calloc.allocate(defaultBufferSize);
+  Pointer<Void> buf;
 
   @override
   Future<void> close() async {
     _close();
+  }
+
+  void _expandBuffer() {
+    // Não expandir se adaptativo estiver desabilitado
+    if (!enableAdaptiveBuffer) return;
+
+    // Não expandir se já atingiu o máximo
+    if (currentBufferSize >= maxBufferSize) {
+      odbc._log.warning(
+        'Buffer expansion requested but already at maximum size: '
+        '$currentBufferSize bytes (max: $maxBufferSize)',
+      );
+      return;
+    }
+
+    // Dobrar o tamanho, mas respeitando o máximo
+    final oldSize = currentBufferSize;
+    final newSize = (currentBufferSize * 2).clamp(0, maxBufferSize);
+    if (newSize <= currentBufferSize) return;
+
+    // Liberar buffer antigo
+    calloc.free(buf);
+    buf = nullptr; // Proteção: marcar como null antes de alocar novo
+
+    // Alocar novo buffer maior (pode lançar exceção se falhar)
+    try {
+      buf = calloc.allocate(newSize);
+      currentBufferSize = newSize;
+      odbc._log.fine('Buffer expanded from $oldSize to $newSize bytes');
+    } catch (e) {
+      // Se alocação falhar, cursor fica em estado inválido
+      // Relançar exceção para que caller possa tratar
+      odbc._log.severe('Failed to allocate expanded buffer: $newSize bytes', e);
+      rethrow;
+    }
   }
 
   void _close() {
@@ -153,38 +205,72 @@ class _OdbcCursorImpl implements OdbcCursor {
       if (columnType != null && isSQLTypeBinary(columnType)) {
         // incremental read for binary data
         final collected = <int>[];
+        var expansionAttempts = 0;
+        const maxExpansionAttempts = 10; // Limite de segurança
 
         while (true) {
-          final status = tryOdbc(
-            sql.SQLGetData(
-              hStmt,
-              i,
-              SQL_C_BINARY,
-              buf.cast(),
-              defaultBufferSize,
-              pColumnValueLength,
-            ),
-            handle: hStmt,
-            onException: FetchException(),
-            beforeThrow: _close,
-          );
+          try {
+            final status = tryOdbc(
+              sql.SQLGetData(
+                hStmt,
+                i,
+                SQL_C_BINARY,
+                buf.cast(),
+                currentBufferSize, // Usar currentBufferSize dinâmico
+                pColumnValueLength,
+              ),
+              handle: hStmt,
+              onException: FetchException(),
+              beforeThrow: _close,
+            );
 
-          if (pColumnValueLength.value == SQL_NULL_DATA) {
-            // null column
-            break;
-          }
+            if (pColumnValueLength.value == SQL_NULL_DATA) {
+              // null column
+              break;
+            }
 
-          final returnedBytes = pColumnValueLength.value;
-          final unitsReturned = returnedBytes == SQL_NO_TOTAL
-              ? defaultBufferSize
-              : (returnedBytes ~/ sizeOf<Uint8>()).clamp(0, defaultBufferSize);
+            final returnedBytes = pColumnValueLength.value;
+            final unitsReturned = returnedBytes == SQL_NO_TOTAL
+                ? currentBufferSize
+                : (returnedBytes ~/ sizeOf<Uint8>())
+                    .clamp(0, currentBufferSize);
 
-          if (unitsReturned > 0) {
-            collected.addAll(buf.cast<Uint8>().asTypedList(unitsReturned));
-          }
+            if (unitsReturned > 0) {
+              collected.addAll(buf.cast<Uint8>().asTypedList(unitsReturned));
+            }
 
-          if (status == SQL_SUCCESS) {
-            break;
+            if (status == SQL_SUCCESS) {
+              break;
+            }
+          } on ODBCException catch (e) {
+            // Detectar HY090 (buffer inválido)
+            if (e.sqlState == 'HY090' && enableAdaptiveBuffer) {
+              if (expansionAttempts >= maxExpansionAttempts) {
+                odbc._log.warning(
+                  'Max expansion attempts ($maxExpansionAttempts) reached '
+                  'for column $i',
+                );
+                rethrow; // Relançar erro após muitas tentativas
+              }
+
+              final oldSize = currentBufferSize;
+              _expandBuffer();
+              expansionAttempts++;
+
+              // Se não expandiu (atingiu máximo), relançar erro
+              if (currentBufferSize == oldSize) {
+                odbc._log.warning(
+                  'Buffer expansion failed: already at maximum size '
+                  '($currentBufferSize)',
+                );
+                rethrow;
+              }
+
+              // Continuar loop para retentar com novo buffer maior
+              continue;
+            }
+            // Outros erros: relançar
+            rethrow;
           }
         }
 
@@ -226,43 +312,73 @@ class _OdbcCursorImpl implements OdbcCursor {
         final collectedUnits = <int>[];
 
         // incremental read for wide char (UTF-16) data
-        final unitBuf = defaultBufferSize ~/ sizeOf<Uint16>();
-        final bufBytes = unitBuf * sizeOf<Uint16>();
+        // Recalcular unitBuf e bufBytes com currentBufferSize (dinâmico)
+        var expansionAttempts = 0;
+        const maxExpansionAttempts = 10;
 
         while (true) {
-          final status = tryOdbc(
-            sql.SQLGetData(
-              hStmt,
-              i,
-              SQL_WCHAR,
-              buf.cast(),
-              bufBytes,
-              pColumnValueLength,
-            ),
-            handle: hStmt,
-            onException: FetchException(),
-            beforeThrow: _close,
-          );
+          // Recalcular a cada iteração (pode ter expandido)
+          final unitBuf = currentBufferSize ~/ sizeOf<Uint16>();
+          final bufBytes = unitBuf * sizeOf<Uint16>();
 
-          if (pColumnValueLength.value == SQL_NULL_DATA) {
-            // null column
-            break;
-          }
+          try {
+            final status = tryOdbc(
+              sql.SQLGetData(
+                hStmt,
+                i,
+                SQL_WCHAR,
+                buf.cast(),
+                bufBytes,
+                pColumnValueLength,
+              ),
+              handle: hStmt,
+              onException: FetchException(),
+              beforeThrow: _close,
+            );
 
-          final returnedBytes = pColumnValueLength.value;
-          final maxUnitsInBuffer = unitBuf;
+            if (pColumnValueLength.value == SQL_NULL_DATA) {
+              // null column
+              break;
+            }
 
-          final unitsReturned = returnedBytes == SQL_NO_TOTAL
-              ? maxUnitsInBuffer
-              : (returnedBytes ~/ sizeOf<Uint16>()).clamp(0, maxUnitsInBuffer);
+            final returnedBytes = pColumnValueLength.value;
+            final maxUnitsInBuffer = unitBuf;
 
-          if (unitsReturned > 0) {
-            collectedUnits
-                .addAll(buf.cast<Uint16>().asTypedList(unitsReturned));
-          }
+            final unitsReturned = returnedBytes == SQL_NO_TOTAL
+                ? maxUnitsInBuffer
+                : (returnedBytes ~/ sizeOf<Uint16>())
+                    .clamp(0, maxUnitsInBuffer);
 
-          if (status == SQL_SUCCESS) {
-            break;
+            if (unitsReturned > 0) {
+              collectedUnits
+                  .addAll(buf.cast<Uint16>().asTypedList(unitsReturned));
+            }
+
+            if (status == SQL_SUCCESS) {
+              break;
+            }
+          } on ODBCException catch (e) {
+            if (e.sqlState == 'HY090' && enableAdaptiveBuffer) {
+              if (expansionAttempts >= maxExpansionAttempts) {
+                odbc._log.warning(
+                  'Max expansion attempts ($maxExpansionAttempts) reached '
+                  'for column $i',
+                );
+                rethrow;
+              }
+              final oldSize = currentBufferSize;
+              _expandBuffer();
+              expansionAttempts++;
+              if (currentBufferSize == oldSize) {
+                odbc._log.warning(
+                  'Buffer expansion failed: already at maximum size '
+                  '($currentBufferSize)',
+                );
+                rethrow;
+              }
+              continue; // Retentar com novo buffer
+            }
+            rethrow;
           }
         }
 

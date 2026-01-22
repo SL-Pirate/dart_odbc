@@ -7,13 +7,35 @@ import 'package:logging/logging.dart';
 /// Non-blocking ODBC client implementation.
 class DartOdbc implements IDartOdbc {
   /// Constructor for [DartOdbc].
-  DartOdbc({this.dsn, this.pathToDriver});
+  /// The [bufferSize] parameter sets the buffer size in bytes for reading data.
+  /// Default is 4096 (4KB). Increase this value for better performance with
+  /// large datasets, but be aware of memory constraints.
+  /// The [maxBufferSize] parameter sets the maximum buffer size for adaptive
+  /// expansion. Default is 65536 (64KB).
+  /// The [enableAdaptiveBuffer] parameter enables/disables automatic buffer
+  /// expansion when HY090 errors occur. Default is true.
+  DartOdbc({
+    this.dsn,
+    this.pathToDriver,
+    this.bufferSize,
+    this.maxBufferSize,
+    this.enableAdaptiveBuffer = true,
+  });
 
   /// Data Source Name.
   final String? dsn;
 
   /// Path to the ODBC driver.
   final String? pathToDriver;
+
+  /// Buffer size in bytes for reading data.
+  final int? bufferSize;
+
+  /// Maximum buffer size for adaptive expansion.
+  final int? maxBufferSize;
+
+  /// Enable/disable adaptive buffer expansion.
+  final bool enableAdaptiveBuffer;
 
   final Logger _log = Logger('DartOdbcNonBlocking');
 
@@ -32,6 +54,9 @@ class DartOdbc implements IDartOdbc {
     _isolateClient = OdbcIsolateClient(
       dsn: dsn,
       pathToDriver: pathToDriver,
+      bufferSize: bufferSize,
+      maxBufferSize: maxBufferSize,
+      enableAdaptiveBuffer: enableAdaptiveBuffer,
     );
 
     final result = await _isolateClient!.request(
@@ -61,6 +86,9 @@ class DartOdbc implements IDartOdbc {
     _isolateClient = OdbcIsolateClient(
       dsn: dsn,
       pathToDriver: pathToDriver,
+      bufferSize: bufferSize,
+      maxBufferSize: maxBufferSize,
+      enableAdaptiveBuffer: enableAdaptiveBuffer,
     );
 
     final response = await _isolateClient!.request(

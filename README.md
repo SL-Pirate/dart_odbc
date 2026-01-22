@@ -62,6 +62,16 @@ await odbc.connect(
 );
 ```
 
+By default, encryption is enabled. To disable encryption (for example, when connecting to a local database without SSL/TLS):
+
+```dart
+await odbc.connect(
+  username: 'db_username',
+  password: 'db_password',
+  encrypt: false,
+);
+```
+
 Or connect via a connection string:
 
 ```dart
@@ -98,15 +108,37 @@ For large result sets, you can use the `executeCursor` method to stream results 
 final cursor = await odbc.executeCursor('SELECT * FROM LARGE_TABLE');
 try {
   while (true) {
-    final row = await cursor.fetch();
+    final row = await cursor.next();
     if (row is CursorDone) {
       break; // No more rows
     }
     // Process the row (which is a Map<String, dynamic>)
-    print(row);
+    final data = (row as CursorItem).value;
+    print(data);
   }
 } finally {
   await cursor.close(); // Ensure resources are freed
+}
+```
+
+You can also use prepared statements with cursors:
+
+```dart
+final cursor = await odbc.executeCursor(
+  'SELECT * FROM USERS WHERE UID = ?',
+  params: [1],
+);
+try {
+  while (true) {
+    final row = await cursor.next();
+    if (row is CursorDone) {
+      break;
+    }
+    final data = (row as CursorItem).value;
+    print(data);
+  }
+} finally {
+  await cursor.close();
 }
 ```
 
@@ -136,8 +168,108 @@ When calling `execute`, the result is a `Future<List<Map<String, dynamic>>>`, wh
 
 ### Get Tables
 
+Get all tables in the database:
+
 ```dart
-final List<Map<String, String>> tables = await odbc.getTables();
+final List<Map<String, dynamic>> tables = await odbc.getTables();
+```
+
+Filter tables by name, catalog, schema, or type:
+
+```dart
+// Get tables with a specific name
+final tables = await odbc.getTables(tableName: 'USERS');
+
+// Get tables in a specific schema
+final tables = await odbc.getTables(schema: 'dbo');
+
+// Get only user tables (exclude system tables)
+final userTables = await odbc.getTables(tableType: 'TABLE');
+
+// Combine filters
+final tables = await odbc.getTables(
+  tableName: 'USERS',
+  schema: 'dbo',
+  catalog: 'MyDatabase',
+);
+```
+
+### Get Columns
+
+Retrieve information about columns in a table:
+
+```dart
+final columns = await odbc.getColumns(tableName: 'USERS');
+
+for (final column in columns) {
+  print('Column: ${column['COLUMN_NAME']}');
+  print('Type: ${column['TYPE_NAME']}');
+  print('Size: ${column['COLUMN_SIZE']}');
+  print('Nullable: ${column['NULLABLE']}');
+}
+```
+
+Filter columns by catalog, schema, or column name:
+
+```dart
+// Get specific column
+final column = await odbc.getColumns(
+  tableName: 'USERS',
+  columnName: 'UID',
+);
+
+// Get columns from specific schema
+final columns = await odbc.getColumns(
+  tableName: 'USERS',
+  schema: 'dbo',
+  catalog: 'MyDatabase',
+);
+```
+
+### Get Primary Keys
+
+Retrieve information about primary key columns:
+
+```dart
+final primaryKeys = await odbc.getPrimaryKeys(tableName: 'USERS');
+
+for (final pk in primaryKeys) {
+  print('PK Column: ${pk['COLUMN_NAME']}');
+  print('Sequence: ${pk['KEY_SEQ']}');
+}
+```
+
+Filter by catalog and schema:
+
+```dart
+final primaryKeys = await odbc.getPrimaryKeys(
+  tableName: 'USERS',
+  schema: 'dbo',
+  catalog: 'MyDatabase',
+);
+```
+
+### Get Foreign Keys
+
+Retrieve information about foreign key relationships:
+
+```dart
+// Get all foreign keys in the USERS table
+final foreignKeys = await odbc.getForeignKeys(fkTableName: 'USERS');
+
+// Get foreign keys that reference the ORDERS table
+final foreignKeys = await odbc.getForeignKeys(pkTableName: 'ORDERS');
+
+// Get specific foreign key relationship
+final foreignKeys = await odbc.getForeignKeys(
+  pkTableName: 'ORDERS',
+  fkTableName: 'USERS',
+);
+
+for (final fk in foreignKeys) {
+  print('FK Column: ${fk['FKCOLUMN_NAME']}');
+  print('References: ${fk['PKTABLE_NAME']}.${fk['PKCOLUMN_NAME']}');
+}
 ```
 
 ### Disconnecting from the database
@@ -184,6 +316,27 @@ void main() {
 ```
 
 - If logging is not enabled by the application, all log messages are silently ignored.
+
+### Blocking Client
+
+By default, `DartOdbc` uses a non-blocking implementation that runs database operations in a dedicated isolate. For environments where isolates are not desired or not available, you can use `DartOdbcBlockingClient`:
+
+```dart
+import 'package:dart_odbc/dart_odbc.dart';
+
+final odbc = DartOdbcBlockingClient(dsn: '<your_dsn>');
+
+await odbc.connect(
+  username: 'db_username',
+  password: 'db_password',
+);
+
+final result = await odbc.execute('SELECT * FROM USERS');
+
+await odbc.disconnect();
+```
+
+**Note**: The blocking client runs all operations synchronously in the current isolate, which may block the UI thread in Flutter applications. Use the default `DartOdbc` (non-blocking) for Flutter apps.
 
 ### Accessing ODBC driver bindings directly
 

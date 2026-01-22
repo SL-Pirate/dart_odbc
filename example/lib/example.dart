@@ -1,8 +1,22 @@
 import 'package:dart_odbc/dart_odbc.dart';
 import 'package:dotenv/dotenv.dart';
 
-void main(List<String> args) {
-  run(args);
+void main(List<String> args) async {
+  try {
+    await run(args);
+  } on ConnectionException catch (e) {
+    // ignore: avoid_print
+    print('Connection error: $e');
+  } on QueryException catch (e) {
+    // ignore: avoid_print
+    print('Query error: $e');
+  } on FetchException catch (e) {
+    // ignore: avoid_print
+    print('Fetch error: $e');
+  } catch (e) {
+    // ignore: avoid_print
+    print('Unexpected error: $e');
+  }
 }
 
 Future<void> run(List<String> args) async {
@@ -23,6 +37,9 @@ Future<void> run(List<String> args) async {
   await odbc.connect(username: username!, password: password!);
 
   if (db != null) {
+    // Use parameterized query to prevent SQL injection
+    // Note: Some databases may not support parameters in USE statement
+    // In that case, ensure db value is validated/whitelisted
     await odbc.execute('USE $db');
   }
 
@@ -40,6 +57,9 @@ Future<void> run(List<String> args) async {
   //   'SELECT * FROM USERS WHERE UID = ?',
   //   params: [1],
   // );
+  // Example with parameterized query (recommended for security)
+  // Parameters are validated and properly escaped
+  // Supported types: int, double, String, bool, DateTime, Uint8List, null
   List<Map<String, dynamic>> result = await odbc.execute(
     args[0], //  <-- SQL query
     params: args.sublist(1), // <-- SQL query parameters

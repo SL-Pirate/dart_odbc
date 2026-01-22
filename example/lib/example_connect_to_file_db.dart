@@ -25,8 +25,14 @@ Future<void> run(List<String> args) async {
   try {
     await odbc.connectWithConnectionString(connStr);
     await _getAndPrintSheetsWithData(odbc);
+  } on ConnectionException catch (e) {
+    stderr.writeln("Connection error: $e");
+  } on QueryException catch (e) {
+    stderr.writeln("Query error: $e");
+  } on FetchException catch (e) {
+    stderr.writeln("Fetch error: $e");
   } catch (e) {
-    stderr.writeln("Error: $e");
+    stderr.writeln("Unexpected error: $e");
   } finally {
     await odbc.disconnect();
   }

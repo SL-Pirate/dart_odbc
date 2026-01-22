@@ -10,7 +10,13 @@ import 'package:logging/logging.dart';
 /// manages its own isolate and ODBC connection.
 class OdbcIsolateClient extends IsolateClient {
   /// Constructor for [OdbcIsolateClient].
-  OdbcIsolateClient({this.dsn, this.pathToDriver});
+  OdbcIsolateClient({
+    this.dsn,
+    this.pathToDriver,
+    this.bufferSize,
+    this.maxBufferSize,
+    this.enableAdaptiveBuffer = true,
+  });
 
   /// Only used during isolate initialization
   /// which is outside the isolate
@@ -19,6 +25,15 @@ class OdbcIsolateClient extends IsolateClient {
   /// Only used during isolate initialization
   /// which is outside the isolate
   final String? pathToDriver;
+
+  /// Buffer size in bytes for reading data.
+  final int? bufferSize;
+
+  /// Maximum buffer size for adaptive expansion.
+  final int? maxBufferSize;
+
+  /// Enable/disable adaptive buffer expansion.
+  final bool enableAdaptiveBuffer;
 
   /// THIS IS THE ONLY SHARED STATE INSIDE THE ISOLATE
   /// DO NOT ACCESS THIS FROM OUTSIDE THE ISOLATE
@@ -51,6 +66,9 @@ class OdbcIsolateClient extends IsolateClient {
         {
           'dsn': dsn,
           'pathToDriver': pathToDriver,
+          'bufferSize': bufferSize,
+          'maxBufferSize': maxBufferSize,
+          'enableAdaptiveBuffer': enableAdaptiveBuffer,
         },
       ),
     );
@@ -81,7 +99,17 @@ class OdbcIsolateClient extends IsolateClient {
         }
         final dsn = message.arguments['dsn'] as String?;
         final pathToDriver = message.arguments['pathToDriver'] as String?;
-        __odbc = DartOdbcBlockingClient(dsn: dsn, pathToDriver: pathToDriver);
+        final bufferSize = message.arguments['bufferSize'] as int?;
+        final maxBufferSize = message.arguments['maxBufferSize'] as int?;
+        final enableAdaptiveBuffer =
+            message.arguments['enableAdaptiveBuffer'] as bool? ?? true;
+        __odbc = DartOdbcBlockingClient(
+          dsn: dsn,
+          pathToDriver: pathToDriver,
+          bufferSize: bufferSize,
+          maxBufferSize: maxBufferSize,
+          enableAdaptiveBuffer: enableAdaptiveBuffer,
+        );
         return ResponsePayload();
 
       case OdbcCommand.connect:

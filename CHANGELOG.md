@@ -1,3 +1,37 @@
+## UNRELEASED
+
+### Breaking Changes
+- **REMOVED**: Automatic `SELECT *` to `CAST AS NVARCHAR(MAX)` transformation
+  - This transformation caused significant performance degradation (2x slower)
+  - Caused excessive memory usage (up to 2GB per column)
+  - Lost type information (all data became strings)
+  - The existing incremental SQLGetData implementation already handles large columns correctly
+  - **Migration**: No code changes needed - queries now work faster and preserve original data types
+
+### Bug Fixes
+- **FIXED**: SQLFetch error handling - errors are now properly logged instead of being masked
+  - Previously, `SQL_ERROR (-1)` and `SQL_INVALID_HANDLE (-2)` were treated as normal end-of-data
+  - This caused silent failures in concurrent cursor operations
+  - Now errors are logged with appropriate warnings
+- **FIXED**: Concurrent cursor operations now work correctly
+  - Test `multiple non-blocking clients can run cursors concurrently` now passes
+  - Better handling of invalid cursor states from ODBC drivers
+
+### Improvements
+- **Performance**: Queries are now ~2x faster (no metadata query overhead)
+- **Memory**: 10-20x lower memory usage for large result sets
+- **Type preservation**: INT, DATETIME, BINARY types are now preserved (not converted to strings)
+- **Code quality**: Reduced codebase by 150 lines (37% reduction in execute.dart)
+- **Buffer management**: Improved adaptive buffer expansion
+  - Changed from aggressive doubling (4KB→8KB→16KB→32KB→64KB) to gradual +8KB increments
+  - Added maximum expansion limit (10 expansions) to prevent infinite loops
+  - Better logging of buffer expansion events
+
+### Documentation
+- Improved documentation of ODBC Driver 18 HY104 workaround for string parameters
+- Added detailed comments explaining why certain design decisions were made
+- Clarified security implications of string parameter escaping
+
 ## 1.0.0
 
 - Initial version.

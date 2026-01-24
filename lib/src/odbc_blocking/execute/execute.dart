@@ -9,10 +9,7 @@ extension on DartOdbcBlockingClient {
       throw ODBCException('Not connected to the database');
     }
 
-    // Transform SELECT * queries before execution
-    final transformedQuery = await _transformSelectStarQueryAsync(query);
-
-    final hStmt = _execStatement(transformedQuery, params);
+    final hStmt = _execStatement(query, params);
 
     return _getResultBulk(hStmt);
   }
@@ -25,10 +22,7 @@ extension on DartOdbcBlockingClient {
       throw ODBCException('Not connected to the database');
     }
 
-    // Transform SELECT * queries before execution
-    final transformedQuery = await _transformSelectStarQueryAsync(query);
-
-    final hStmt = _execStatement(transformedQuery, params);
+    final hStmt = _execStatement(query, params);
 
     return _getResult(hStmt);
   }
@@ -54,25 +48,32 @@ extension on DartOdbcBlockingClient {
     // hstatement will be freed by the cursor
     final hStmt = pHStmt.value;
 
-    // WORKAROUND for ODBC Driver 18 HY104 issue
-    // ODBC Driver 18 for SQL Server returns HY104 (Invalid parameter value)
-    // when binding string parameters using SQLBindParameter with SQL_WVARCHAR.
-    // This workaround substitutes string parameters directly into the query
-    // using SQLExecDirectW, while non-string parameters continue to use
-    // prepared statements for security.
+    // WORKAROUND for ODBC Driver 18 HY104 issue with SQL_WVARCHAR
+    // parameter binding
     //
-    // Security considerations:
-    // - String parameters are escaped using SQL standard (single quotes
-    //   doubled)
-    // - This prevents SQL injection but is less secure than parameter binding
-    // - Non-string parameters still use prepared statements (secure)
+    // Issue: ODBC Driver 18.x for SQL Server returns HY104
+    // (Invalid parameter value) when binding string parameters using
+    // SQLBindParameter with SQL_WVARCHAR.
     //
-    // Limitations:
-    // - String parameters cannot be null (use empty string instead)
-    // - Performance may be slightly worse due to lack of query plan caching
+    // Solution: Substitute string parameters directly into the query using
+    // SQL-standard escaping (single quotes doubled), while keeping non-string
+    // parameters bound securely via SQLBindParameter.
     //
-    // TODO(odbc): Investigate root cause and remove workaround when ODBC Driver
-    //             18 issue is resolved or alternative binding method is found.
+    // Security: String escaping prevents SQL injection but is less secure than
+    // true parameter binding. Non-string parameters remain fully secure.
+    //
+    // Performance: Substituted queries cannot use cached query plans, slightly
+    // reducing performance for repeated queries with different string values.
+    //
+    // Alternative solutions tested:
+    // - SQL_WLONGVARCHAR: Still causes HY104 on Driver 18.x
+    // - SQL_LONGVARCHAR: Loses Unicode support (unacceptable)
+    // - SQL_VARCHAR: Loses Unicode support (unacceptable)
+    //
+    // Status: This workaround is necessary until ODBC Driver 18.x is fixed
+    // or a better binding method is discovered. Monitor driver updates.
+    //
+    // TODO(odbc): Test with ODBC Driver 18.3+ which may have HY104 fixes
     final hasStringParams = params != null && params.any((p) => p is String);
 
     String finalQuery;
@@ -221,16 +222,27 @@ extension on DartOdbcBlockingClient {
     return hStmt;
   }
 
-  /// Substitute string parameters directly in query with escaped values.
+  /// Substitute string parameters directly into query with escaped values.
   ///
-  /// Returns the substituted query and list of remaining non-string parameters.
+  /// Returns: (substituted query, remaining non-string parameters)
   ///
-  /// This is a workaround for ODBC Driver 18 HY104 issue with string parameter
-  /// binding. String parameters are escaped using SQL standard (single quotes
-  /// doubled) to prevent SQL injection, but this is less secure than parameter
-  /// binding used for non-string types.
+  /// This function processes parameter placeholders (?) in the query:
+  /// - String parameters: Replaced with escaped and quoted values
+  /// - Non-string parameters: Left as ? for SQLBindParameter
   ///
-  /// See [_execStatement] documentation for more details on the workaround.
+  /// Example:
+  /// ```dart
+  /// query: "SELECT * FROM users WHERE name = ? AND age = ?"
+  /// params: ["O'Brien", 30]
+  /// result: ("SELECT * FROM users WHERE name = 'O''Brien' AND age = ?", [30])
+  /// ```
+  ///
+  /// Security: String escaping uses SQL standard (doubled quotes) which is
+  /// secure against SQL injection. However, parameter binding is still
+  /// preferred for maximum security.
+  ///
+  /// This is a workaround for ODBC Driver 18 HY104 issue. See [_execStatement]
+  /// documentation for details.
   (String query, List<dynamic> params) _substituteStringParams(
     String query,
     List<dynamic> params,
@@ -269,192 +281,27 @@ extension on DartOdbcBlockingClient {
     return (substituted, remainingParams);
   }
 
-  /// Escape SQL string to prevent SQL injection
-  /// Replaces single quotes with two single quotes (SQL standard)
+  /// Escape SQL string to prevent SQL injection.
+  ///
+  /// Uses SQL-standard escaping: single quotes are doubled.
+  /// This is the ANSI SQL standard method for escaping string literals.
+  ///
+  /// Examples:
+  /// - "John" -> "John"
+  /// - "O'Brien" -> "O''Brien"
+  /// - "It's a test" -> "It''s a test"
+  ///
+  /// Note: This method is secure against SQL injection when the escaped
+  /// string is wrapped in single quotes: WHERE name = 'escaped_value'
+  ///
+  /// Security: This is less secure than parameter binding (SQLBindParameter)
+  /// but is necessary as a workaround for ODBC Driver 18 HY104 issue.
   String _escapeSqlString(String value) {
+    // SQL standard: double any single quotes
+    // This is the ANSI SQL way to escape quotes in string literals
     return value.replaceAll("'", "''");
   }
 
-  /// Transform SELECT * queries to use CAST AS NVARCHAR(MAX) for all columns.
-  ///
-  /// This prevents buffer/memory errors (HY090/HY001) when querying tables
-  /// with many columns or large data types. The transformation:
-  /// - Detects SELECT * FROM table patterns
-  /// - Obtains column names from INFORMATION_SCHEMA or sys.columns
-  /// - Replaces SELECT * with explicit column list using CAST AS NVARCHAR(MAX)
-  ///
-  /// Returns the original query if no transformation is needed.
-  Future<String> _transformSelectStarQueryAsync(String query) async {
-    // Simple regex to detect SELECT * FROM table pattern
-    // Match: SELECT [TOP n] [DISTINCT] * FROM table (with optional schema/alias)
-    final selectStarPattern = RegExp(
-      r'SELECT\s+((?:TOP\s+\d+\s+)?(?:DISTINCT\s+)?)\*\s+FROM\s+(\[?(\w+)\]?\.)?(\[?(\w+)\]?)',
-      caseSensitive: false,
-    );
-
-    final match = selectStarPattern.firstMatch(query);
-    if (match == null) {
-      // No SELECT * found, return original query
-      return query;
-    }
-
-    // Extract modifiers (TOP, DISTINCT), table name and schema
-    final modifiers = match.group(1) ?? '';
-    final schema = match.group(3);
-    final tableName = match.group(5);
-    if (tableName == null) {
-      return query;
-    }
-
-    // Log transformation attempt
-    _log.fine(
-      'Transforming SELECT * query: table=$tableName, schema=$schema',
-    );
-
-    // Get column names from sys.columns (more reliable than INFORMATION_SCHEMA)
-    // Try with schema first, then without schema, then with 'dbo' as default
-    final columnQuery = schema != null
-        ? 'SELECT c.name FROM sys.columns c '
-            'INNER JOIN sys.tables t ON c.object_id = t.object_id '
-            'INNER JOIN sys.schemas s ON t.schema_id = s.schema_id '
-            "WHERE s.name = '$schema' AND t.name = '$tableName' "
-            'ORDER BY c.column_id'
-        : 'SELECT c.name FROM sys.columns c '
-            'INNER JOIN sys.tables t ON c.object_id = t.object_id '
-            'INNER JOIN sys.schemas s ON t.schema_id = s.schema_id '
-            "WHERE (s.name = 'dbo' OR s.name = SCHEMA_NAME()) "
-            "AND t.name = '$tableName' "
-            'ORDER BY c.column_id';
-
-    // Execute query to get column names
-    // Note: This requires a separate statement handle
-    // We'll use a simpler approach: execute the metadata query first
-    final tempHStmt = calloc<SQLHSTMT>();
-    try {
-      _tryOdbc(
-        _sql.SQLAllocHandle(SQL_HANDLE_STMT, _hConn, tempHStmt),
-        handle: _hConn,
-        onException: HandleException(),
-      );
-
-      final cColumnQuery = columnQuery.toNativeUtf16();
-      try {
-        _tryOdbc(
-          _sql.SQLExecDirectW(tempHStmt.value, cColumnQuery.cast(), SQL_NTS),
-          handle: tempHStmt.value,
-          onException: QueryException(),
-        );
-
-        final columns = <String>[];
-        final pColumnValueLength = calloc<SQLLEN>();
-        final buf = calloc.allocate(_bufferSize);
-        try {
-          while (true) {
-            final rc = _sql.SQLFetch(tempHStmt.value);
-            if (rc < 0 || rc == SQL_NO_DATA) {
-              break;
-            }
-
-            // Incremental read for wide char (UTF-16) data
-            final unitBuf = _bufferSize ~/ sizeOf<Uint16>();
-            final bufBytes = unitBuf * sizeOf<Uint16>();
-            final collectedUnits = <int>[];
-
-            while (true) {
-              final status = _tryOdbc(
-                _sql.SQLGetData(
-                  tempHStmt.value,
-                  1,
-                  SQL_WCHAR,
-                  buf.cast(),
-                  bufBytes,
-                  pColumnValueLength,
-                ),
-                handle: tempHStmt.value,
-                onException: FetchException(),
-              );
-
-              if (pColumnValueLength.value == SQL_NULL_DATA) {
-                break;
-              }
-
-              final returnedBytes = pColumnValueLength.value;
-              final maxUnitsInBuffer = unitBuf;
-
-              final unitsReturned = returnedBytes == SQL_NO_TOTAL
-                  ? maxUnitsInBuffer
-                  : (returnedBytes ~/ sizeOf<Uint16>())
-                      .clamp(0, maxUnitsInBuffer);
-
-              if (unitsReturned > 0) {
-                collectedUnits
-                    .addAll(buf.cast<Uint16>().asTypedList(unitsReturned));
-              }
-
-              if (status == SQL_SUCCESS) {
-                break;
-              }
-            }
-
-            if (collectedUnits.isNotEmpty) {
-              collectedUnits.removeWhere((e) => e == 0);
-              final columnName = String.fromCharCodes(collectedUnits);
-              columns.add(columnName);
-            }
-          }
-        } finally {
-          calloc
-            ..free(buf)
-            ..free(pColumnValueLength);
-        }
-
-        calloc.free(cColumnQuery);
-        _freeSqlStmtHandle(tempHStmt.value);
-        calloc.free(tempHStmt);
-
-        if (columns.isEmpty) {
-          // No columns found, return original query
-          return query;
-        }
-
-        // Build transformed query with CAST AS NVARCHAR(MAX)
-        final tableRef = schema != null
-            ? '[$schema].[$tableName]'
-            : '[$tableName]';
-        final castColumns = columns
-            .map((col) => 'CAST([$col] AS NVARCHAR(MAX)) AS [$col]')
-            .join(', ');
-
-        // Replace SELECT * FROM table with transformed version
-        // Preserve TOP and DISTINCT modifiers if present
-        final transformed = query.replaceFirst(
-          selectStarPattern,
-          'SELECT $modifiers$castColumns FROM $tableRef',
-        );
-
-        _log.fine(
-          'SELECT * transformed successfully: ${columns.length} columns',
-        );
-        return transformed;
-      } on Object catch (e) {
-        _log.warning(
-          'Failed to transform SELECT * query (metadata query failed): $e',
-        );
-        calloc.free(cColumnQuery);
-        _freeSqlStmtHandle(tempHStmt.value);
-        calloc.free(tempHStmt);
-        // If metadata query fails, return original query
-        return query;
-      }
-    } on Object catch (e) {
-      _log.warning(
-        'Failed to transform SELECT * query (allocation failed): $e',
-      );
-      calloc.free(tempHStmt);
-      // If allocation fails, return original query
-      return query;
-    }
-  }
 
   /// Validates that all parameters are of supported types.
   ///

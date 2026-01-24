@@ -57,7 +57,7 @@ class DartOdbcBlockingClient implements IDartOdbc {
       throw ArgumentError('bufferSize must be greater than 0, got: $size');
     }
     if (size > 1024 * 1024 * 1024) {
-      // 1GB limite razoável
+      // 1GB reasonable limit
       throw ArgumentError('bufferSize too large: $size bytes (max: 1GB)');
     }
     return size;
@@ -71,7 +71,7 @@ class DartOdbcBlockingClient implements IDartOdbc {
       );
     }
     if (maxSize > 1024 * 1024 * 1024) {
-      // 1GB limite razoável
+      // 1GB reasonable limit
       throw ArgumentError('maxBufferSize too large: $maxSize bytes (max: 1GB)');
     }
     return maxSize;

@@ -47,6 +47,31 @@ final odbc = DartOdbc(
 
 It is generally preferable to provide the path to the ODBC driver manager (for example, unixODBC) rather than a vendor-issued driver library. The driver manager acts as a compatibility layer across drivers; a vendor driver may work but is not recommended.
 
+### Buffer Configuration
+
+For optimal performance with large datasets or binary data (BINARY, VARBINARY, IMAGE), you can configure buffer sizes:
+
+```dart
+final odbc = DartOdbc(
+  dsn: '<your_dsn>',
+  bufferSize: 16384,        // Initial buffer size (default: 4KB)
+  maxBufferSize: 131072,    // Maximum buffer size for adaptive expansion (default: 64KB)
+  enableAdaptiveBuffer: true, // Enable automatic buffer expansion (default: true)
+);
+```
+
+**Buffer Parameters:**
+- `bufferSize`: Initial buffer size in bytes for reading data. Default is 4096 (4KB).
+- `maxBufferSize`: Maximum buffer size for adaptive expansion. Default is 65536 (64KB).
+- `enableAdaptiveBuffer`: Enables automatic buffer expansion when HY090 errors occur. Default is `true`.
+
+The adaptive buffer system automatically expands the buffer in 8KB increments when needed, up to `maxBufferSize`. This prevents memory errors when reading large columns or binary data.
+
+**Recommendations:**
+- For small to medium datasets: Use defaults (4KB initial, 64KB max)
+- For large binary data (images, files): Increase `maxBufferSize` to 1MB or more
+- For very large result sets: Use `executeCursor` for streaming instead
+
 ### DSN
 
 The DSN (Data Source Name) is the name you gave when setting up the driver manager.
@@ -155,16 +180,23 @@ Below are currently supported data types for parameter binding. If this does not
 
 ### Fetching data
 
-Currently the library only discriminates between text and binary data types:
+The library preserves original data types and uses incremental reading for optimal performance:
 
-- Binary data types (for example `VARBINARY` or `BINARY`) are returned as `Uint8List`.
-- All other data types are converted to `String` by design.
+- **Binary data types** (`BINARY`, `VARBINARY`, `IMAGE`, `VARBINARY(MAX)`) are returned as `Uint8List`.
+- **Numeric types** (`INT`, `BIGINT`, `DECIMAL`, etc.) are returned as their native Dart types (`int`, `double`).
+- **Date/Time types** (`DATETIME`, `DATE`, `TIME`, `TIMESTAMP`) are returned as `DateTime`.
+- **Text types** (`VARCHAR`, `NVARCHAR`, `TEXT`, etc.) are returned as `String`.
+- **Boolean types** (`BIT`) are returned as `bool`.
 
 When calling `execute`, the result is a `Future<List<Map<String, dynamic>>>`, where each `Map` represents a row.
 
 - Each key in the `Map` corresponds to a column name.
+- Data types are preserved from the database (no automatic conversion to strings).
+- Large columns are read incrementally to avoid memory issues.
 - If execution or decoding fails, DartOdbc throws an `ODBCException`.
 - `ODBCException` includes `message`, `sqlState` (a five-character ODBC standard code), and a `nativeError` code from the driver.
+
+**Performance Note:** The library uses incremental `SQLGetData` reads for large values, eliminating truncation issues and improving memory efficiency. No automatic query transformation is performed - queries execute directly as written.
 
 ### Get Tables
 
@@ -282,9 +314,19 @@ Finally, don’t forget to disconnect and free resources:
 
 ### Examples
 
-See the runnable examples in:
+See the runnable examples in the `example/lib` directory:
 
-- `example/lib`
+- `example.dart` - Basic usage with prepared statements
+- `example_connect_to_file_db.dart` - Connecting to file-based databases (Excel, Access, etc.)
+- `example_flutter_app.dart` - Flutter application example with UI
+- `helper.dart` - Helper class for testing and examples
+
+To run an example:
+
+```bash
+cd example
+dart run lib/example.dart "SELECT * FROM USERS"
+```
 
 ## Logging
 
@@ -337,6 +379,17 @@ await odbc.disconnect();
 ```
 
 **Note**: The blocking client runs all operations synchronously in the current isolate, which may block the UI thread in Flutter applications. Use the default `DartOdbc` (non-blocking) for Flutter apps.
+
+The blocking client also supports the same buffer configuration parameters:
+
+```dart
+final odbc = DartOdbcBlockingClient(
+  dsn: '<your_dsn>',
+  bufferSize: 16384,
+  maxBufferSize: 131072,
+  enableAdaptiveBuffer: true,
+);
+```
 
 ### Accessing ODBC driver bindings directly
 

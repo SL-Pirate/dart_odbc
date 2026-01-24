@@ -227,6 +227,11 @@ const defaultBufferSize = 4096;
 /// default maximum Buffer size for adaptive expansion
 const defaultMaxBufferSize = 65536; // 64KB
 
+/// Buffer size for column name metadata (UTF-16 chars)
+/// Fixed size to avoid HY090 in SQLDescribeColW with large bufferSize
+/// SQL Server limit: 128 chars per column name, 512 provides ample headroom
+const columnNameBufferChars = 512; // 1024 bytes (512 * 2)
+
 /// SQL state string length (SQL_STATE_LENGTH)
 const sqlStateLength = 6;
 

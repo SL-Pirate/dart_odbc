@@ -54,11 +54,12 @@ class _OdbcCursorImpl implements OdbcCursor {
       beforeThrow: _close,
     );
 
-    final columnNameCharSize = bufferSize ~/ sizeOf<Uint16>();
     // allocating memory for column names
     // outside the loop to reduce overhead in memory allocation
+    // Use fixed buffer size for column names to avoid HY090 with large
+    // bufferSize
     final pColumnNameLength = calloc<SQLSMALLINT>();
-    final pColumnName = calloc<Uint16>(columnNameCharSize);
+    final pColumnName = calloc<Uint16>(columnNameBufferChars);
     final pDataType = calloc<SQLSMALLINT>();
 
     for (var i = 1; i <= pColumnCount.value; i++) {
@@ -67,7 +68,7 @@ class _OdbcCursorImpl implements OdbcCursor {
           hStmt,
           i,
           pColumnName.cast(),
-          columnNameCharSize,
+          columnNameBufferChars,
           pColumnNameLength,
           pDataType,
           nullptr,
@@ -123,16 +124,20 @@ class _OdbcCursorImpl implements OdbcCursor {
   Pointer<SQLLEN> pColumnValueLength = calloc<SQLLEN>();
   Pointer<Void> buf;
 
+  // Track buffer expansions to prevent infinite loops
+  int _expansionCount = 0;
+  static const int _maxExpansions = 10;
+
   @override
   Future<void> close() async {
     _close();
   }
 
   void _expandBuffer() {
-    // Não expandir se adaptativo estiver desabilitado
+    // Don't expand if adaptive buffer is disabled
     if (!enableAdaptiveBuffer) return;
 
-    // Não expandir se já atingiu o máximo
+    // Don't expand if already at maximum
     if (currentBufferSize >= maxBufferSize) {
       odbc._log.warning(
         'Buffer expansion requested but already at maximum size: '
@@ -141,23 +146,41 @@ class _OdbcCursorImpl implements OdbcCursor {
       return;
     }
 
-    // Dobrar o tamanho, mas respeitando o máximo
+    // Check expansion limit to prevent infinite loops
+    _expansionCount++;
+    if (_expansionCount > _maxExpansions) {
+      odbc._log.severe(
+        'Maximum buffer expansion limit reached ($_maxExpansions). '
+        'This may indicate data corruption or a driver issue.',
+      );
+      throw FetchException()
+        ..message = 'Buffer expansion limit exceeded'
+        ..code = -1;
+    }
+
+    // Gradual expansion: add 8KB at a time instead of doubling
+    // This avoids excessive memory allocation
     final oldSize = currentBufferSize;
-    final newSize = (currentBufferSize * 2).clamp(0, maxBufferSize);
+    const incrementSize = 8192; // 8KB
+    final newSize = (currentBufferSize + incrementSize).clamp(0, maxBufferSize);
+
     if (newSize <= currentBufferSize) return;
 
-    // Liberar buffer antigo
+    // Free old buffer
     calloc.free(buf);
-    buf = nullptr; // Proteção: marcar como null antes de alocar novo
+    buf = nullptr; // Protection: mark as null before allocating new one
 
-    // Alocar novo buffer maior (pode lançar exceção se falhar)
+    // Allocate new larger buffer (may throw exception if it fails)
     try {
       buf = calloc.allocate(newSize);
       currentBufferSize = newSize;
-      odbc._log.fine('Buffer expanded from $oldSize to $newSize bytes');
+      odbc._log.fine(
+        'Buffer expanded from $oldSize to $newSize bytes '
+        '(expansion $_expansionCount/$_maxExpansions)',
+      );
     } catch (e) {
-      // Se alocação falhar, cursor fica em estado inválido
-      // Relançar exceção para que caller possa tratar
+      // If allocation fails, cursor is in invalid state
+      // Rethrow exception so caller can handle it
       odbc._log.severe('Failed to allocate expanded buffer: $newSize bytes', e);
       rethrow;
     }
@@ -192,21 +215,49 @@ class _OdbcCursorImpl implements OdbcCursor {
     }
 
     final rc = sql.SQLFetch(hStmt);
-    if (rc < 0 || rc == SQL_NO_DATA) {
-      // implicit close on done or error
+
+    // Case 1: No more data (normal end of result set)
+    if (rc == SQL_NO_DATA) {
       _close();
       return const CursorDone();
     }
 
+    // Case 2: Error (rc < 0)
+    // Note: Some ODBC drivers put the statement handle in an invalid state
+    // when SQLFetch fails (SQL_ERROR, SQL_INVALID_HANDLE, etc.), making it
+    // unsafe to call SQLGetDiagRec. We log the error and close gracefully.
+    if (rc < 0) {
+      odbc._log.warning(
+        'SQLFetch returned error code $rc. Closing cursor. '
+        'This may indicate data corruption, driver issue, or query timeout.',
+      );
+      _close();
+      return const CursorDone();
+    }
+
+    // Case 3: Success (rc >= 0, including SQL_SUCCESS_WITH_INFO)
+    // Process row normally (code continues below)
+
     final row = <String, dynamic>{};
     for (var i = 1; i <= pColumnCount.value; i++) {
+      // Check if cursor is still open before reading each column
+      // This prevents issues in concurrent scenarios where cursor might
+      // be closed by another operation
+      if (!_isOpen()) {
+        odbc._log.warning(
+          'Cursor closed unexpectedly while reading column $i. '
+          'This may indicate a concurrency issue.',
+        );
+        return const CursorDone();
+      }
+
       final columnType = columnTypes[columnNames[i - 1]];
 
       if (columnType != null && isSQLTypeBinary(columnType)) {
         // incremental read for binary data
         final collected = <int>[];
         var expansionAttempts = 0;
-        const maxExpansionAttempts = 10; // Limite de segurança
+        const maxExpansionAttempts = 10; // Safety limit
 
         while (true) {
           try {
@@ -216,7 +267,7 @@ class _OdbcCursorImpl implements OdbcCursor {
                 i,
                 SQL_C_BINARY,
                 buf.cast(),
-                currentBufferSize, // Usar currentBufferSize dinâmico
+                currentBufferSize, // Use dynamic currentBufferSize
                 pColumnValueLength,
               ),
               handle: hStmt,
@@ -243,21 +294,32 @@ class _OdbcCursorImpl implements OdbcCursor {
               break;
             }
           } on ODBCException catch (e) {
-            // Detectar HY090 (buffer inválido)
+            // Handle SQL_INVALID_HANDLE (-2) which can occur in
+            // concurrent scenarios
+            if (e.code == -2) {
+              odbc._log.warning(
+                'SQL_INVALID_HANDLE (-2) detected for column $i. '
+                'This typically indicates a concurrency issue. Closing cursor.',
+              );
+              // Cursor already closed by beforeThrow, just return
+              return const CursorDone();
+            }
+
+            // Detect HY090 (invalid buffer)
             if (e.sqlState == 'HY090' && enableAdaptiveBuffer) {
               if (expansionAttempts >= maxExpansionAttempts) {
                 odbc._log.warning(
                   'Max expansion attempts ($maxExpansionAttempts) reached '
                   'for column $i',
                 );
-                rethrow; // Relançar erro após muitas tentativas
+                rethrow; // Rethrow error after many attempts
               }
 
               final oldSize = currentBufferSize;
               _expandBuffer();
               expansionAttempts++;
 
-              // Se não expandiu (atingiu máximo), relançar erro
+              // If didn't expand (reached maximum), rethrow error
               if (currentBufferSize == oldSize) {
                 odbc._log.warning(
                   'Buffer expansion failed: already at maximum size '
@@ -266,10 +328,10 @@ class _OdbcCursorImpl implements OdbcCursor {
                 rethrow;
               }
 
-              // Continuar loop para retentar com novo buffer maior
+              // Continue loop to retry with larger buffer
               continue;
             }
-            // Outros erros: relançar
+            // Other errors: rethrow
             rethrow;
           }
         }
@@ -312,12 +374,12 @@ class _OdbcCursorImpl implements OdbcCursor {
         final collectedUnits = <int>[];
 
         // incremental read for wide char (UTF-16) data
-        // Recalcular unitBuf e bufBytes com currentBufferSize (dinâmico)
+        // Recalculate unitBuf and bufBytes with currentBufferSize (dynamic)
         var expansionAttempts = 0;
         const maxExpansionAttempts = 10;
 
         while (true) {
-          // Recalcular a cada iteração (pode ter expandido)
+          // Recalculate on each iteration (may have expanded)
           final unitBuf = currentBufferSize ~/ sizeOf<Uint16>();
           final bufBytes = unitBuf * sizeOf<Uint16>();
 
@@ -358,6 +420,18 @@ class _OdbcCursorImpl implements OdbcCursor {
               break;
             }
           } on ODBCException catch (e) {
+            // Handle SQL_INVALID_HANDLE (-2) which can occur in
+            // concurrent scenarios
+            if (e.code == -2) {
+              odbc._log.warning(
+                'SQL_INVALID_HANDLE (-2) detected for column $i. '
+                'This typically indicates a concurrency issue. '
+                'Closing cursor.',
+              );
+              // Cursor already closed by beforeThrow, just return
+              return const CursorDone();
+            }
+
             if (e.sqlState == 'HY090' && enableAdaptiveBuffer) {
               if (expansionAttempts >= maxExpansionAttempts) {
                 odbc._log.warning(
@@ -376,7 +450,7 @@ class _OdbcCursorImpl implements OdbcCursor {
                 );
                 rethrow;
               }
-              continue; // Retentar com novo buffer
+              continue; // Retry with new buffer
             }
             rethrow;
           }

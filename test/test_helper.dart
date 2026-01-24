@@ -227,7 +227,8 @@ class TestHelper {
 
           // Try with row pagination as fallback
           testLog.info(
-            'Attempting fallback: processing group $groupNumber with row pagination...',
+            'Attempting fallback: processing group $groupNumber '
+            'with row pagination...',
           );
 
           try {
@@ -236,7 +237,6 @@ class TestHelper {
               groupColumns,
               whereClause: whereClause,
               orderByClause: orderByClause,
-              batchSize: 1000,
             );
 
             if (paginatedResult.isNotEmpty) {
@@ -252,7 +252,7 @@ class TestHelper {
                 'Skipping this column group.',
               );
             }
-          } catch (e2) {
+          } on Object catch (e2) {
             testLog.warning(
               'Group $groupNumber failed even with pagination: $e2. '
               'Skipping this column group.',
@@ -262,13 +262,15 @@ class TestHelper {
         } else {
           // For non-HY001 errors, log and skip this group
           testLog.warning(
-            'Error in group $groupNumber: $e. Skipping this column group.',
+            'Error in group $groupNumber: $e. '
+            'Skipping this column group.',
           );
         }
-      } catch (e) {
+      } on Object catch (e) {
         // Catch any other unexpected errors
         testLog.warning(
-          'Unexpected error in group $groupNumber: $e. Skipping this column group.',
+          'Unexpected error in group $groupNumber: $e. '
+          'Skipping this column group.',
         );
       }
 
@@ -285,14 +287,18 @@ class TestHelper {
       return [];
     }
 
+    final totalGroups = (allColumnNames.length / columnsPerGroup).ceil();
     testLog.info(
       'Successfully processed ${groupResults.length} out of '
-      '${(allColumnNames.length / columnsPerGroup).ceil()} column groups',
+      '$totalGroups column groups',
     );
 
     // Merge results by primary key if available
     if (pkColumn != null && groupResults.length > 1) {
-      testLog.info('Merging ${groupResults.length} column groups by primary key: $pkColumn');
+      testLog.info(
+        'Merging ${groupResults.length} column groups by primary key: '
+        '$pkColumn',
+      );
 
       // Use first group as base
       final merged = <String, Map<String, dynamic>>{};
@@ -327,7 +333,8 @@ class TestHelper {
       if (groupResults.length > 1) {
         testLog.warning(
           'Multiple column groups but no primary key specified. '
-          'Returning only first group. Specify primaryKeyColumn to merge results.',
+          'Returning only first group. '
+          'Specify primaryKeyColumn to merge results.',
         );
       }
     }
@@ -341,8 +348,8 @@ class TestHelper {
     List<String> columns, {
     String? whereClause,
     String? orderByClause,
-    int batchSize = 1000,
   }) async {
+    var batchSize = 1000;
     final selectedColumns = columns.join(', ');
     final wherePart = whereClause != null ? ' WHERE $whereClause' : '';
     final orderByPart = orderByClause != null
@@ -350,7 +357,8 @@ class TestHelper {
         : ' ORDER BY (SELECT NULL)';
 
     // Get total row count
-    final countResult = await exec('SELECT COUNT(*) as total FROM $tableName$wherePart');
+    final countQuery = 'SELECT COUNT(*) as total FROM $tableName$wherePart';
+    final countResult = await exec(countQuery);
     final totalRows = countResult.first['total'] is int
         ? countResult.first['total'] as int
         : int.tryParse(countResult.first['total'].toString()) ?? 0;
@@ -383,8 +391,11 @@ class TestHelper {
             e.message.contains('Memory allocation')) {
           // Even pagination failed - reduce batch size
           if (batchSize > 100) {
-            batchSize = (batchSize / 2).round();
-            testLog.info('Reducing batch size to $batchSize and retrying...');
+            final newBatchSize = (batchSize / 2).round();
+            testLog.info(
+              'Reducing batch size to $newBatchSize and retrying...',
+            );
+            batchSize = newBatchSize;
             continue;
           } else {
             testLog.warning(

@@ -24,10 +24,12 @@ void setupTestLogging() {
       '${record.message}',
     );
     if (record.error != null) {
+      // print is necessary for test output visibility
       // ignore: avoid_print
       print('  Error: ${record.error}');
     }
     if (record.stackTrace != null) {
+      // print is necessary for test output visibility
       // ignore: avoid_print
       print('  StackTrace: ${record.stackTrace}');
     }
@@ -158,7 +160,7 @@ class TestHelper {
     testLog.info('Table "$tableName" has ${allColumnNames.length} columns');
 
     // Determine primary key if not provided
-    String? pkColumn = primaryKeyColumn;
+    var pkColumn = primaryKeyColumn;
     if (pkColumn == null) {
       try {
         final pkResult = await exec(
@@ -174,7 +176,7 @@ class TestHelper {
           pkColumn = pkResult.first['COLUMN_NAME'] as String;
           testLog.info('Auto-detected primary key: $pkColumn');
         }
-      } catch (e) {
+      } on Object catch (e) {
         testLog.warning(
           'Could not auto-detect primary key: $e. '
           'Results will not be merged by key.',
@@ -200,10 +202,11 @@ class TestHelper {
         '${i + groupColumns.length} (${groupColumns.length} columns)',
       );
 
-      bool groupSucceeded = false;
+      var groupSucceeded = false;
 
       try {
-        final query = 'SELECT $selectedColumns FROM $tableName$wherePart$orderByPart';
+        final query =
+            'SELECT $selectedColumns FROM $tableName$wherePart$orderByPart';
         final groupResult = await exec(query);
 
         if (groupResult.isEmpty) {
@@ -226,10 +229,11 @@ class TestHelper {
           );
 
           // Try with row pagination as fallback
-          testLog.info(
-            'Attempting fallback: processing group $groupNumber '
-            'with row pagination...',
-          );
+          testLog
+            ..info(
+              'Attempting fallback: processing group $groupNumber '
+              'with row pagination...',
+            );
 
           try {
             final paginatedResult = await _execWithPagination(

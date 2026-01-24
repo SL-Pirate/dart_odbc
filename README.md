@@ -198,6 +198,62 @@ When calling `execute`, the result is a `Future<List<Map<String, dynamic>>>`, wh
 
 **Performance Note:** The library uses incremental `SQLGetData` reads for large values, eliminating truncation issues and improving memory efficiency. No automatic query transformation is performed - queries execute directly as written.
 
+### Working with Large Tables (200+ Columns)
+
+Some ODBC drivers (notably SQL Server Native Client 11.0) have limitations when processing tables with 200+ columns. You may encounter `HY001` (Memory allocation failure) errors when using `SELECT *` on very wide tables.
+
+**Recommended Solutions:**
+
+1. **Select specific columns** instead of `SELECT *`:
+   ```dart
+   // Instead of: SELECT * FROM LargeTable
+   final result = await odbc.execute(
+     'SELECT Column1, Column2, Column3 FROM LargeTable',
+   );
+   ```
+
+2. **Process columns in groups** if you need all columns:
+   ```dart
+   // Get column names
+   final columns = await odbc.getColumns(tableName: 'LargeTable');
+   final columnNames = columns.map((c) => c['COLUMN_NAME'] as String).toList();
+   
+   // Process in groups of 50 columns
+   const columnsPerGroup = 50;
+   final allResults = <Map<String, dynamic>>[];
+   
+   for (var i = 0; i < columnNames.length; i += columnsPerGroup) {
+     final group = columnNames.skip(i).take(columnsPerGroup).toList();
+     final selectedColumns = group.join(', ');
+     final query = 'SELECT $selectedColumns FROM LargeTable';
+     final groupResult = await odbc.execute(query);
+     // Merge results by primary key in your application code
+     allResults.addAll(groupResult);
+   }
+   ```
+
+3. **Use pagination** for both rows and columns if needed:
+   ```dart
+   // Process 1000 rows at a time with 50 columns per group
+   const batchSize = 1000;
+   const columnsPerGroup = 50;
+   var offset = 0;
+   
+   while (offset < totalRows) {
+     final query = '''
+       SELECT Column1, Column2, ... 
+       FROM LargeTable 
+       ORDER BY PrimaryKey 
+       OFFSET $offset ROWS FETCH NEXT $batchSize ROWS ONLY
+     ''';
+     final batch = await odbc.execute(query);
+     // Process batch...
+     offset += batchSize;
+   }
+   ```
+
+**Note:** The library's incremental `SQLGetData` implementation handles large individual columns correctly. The limitation is specifically with the number of columns, not column size.
+
 ### Get Tables
 
 Get all tables in the database:
@@ -319,6 +375,7 @@ See the runnable examples in the `example/lib` directory:
 - `example.dart` - Basic usage with prepared statements
 - `example_connect_to_file_db.dart` - Connecting to file-based databases (Excel, Access, etc.)
 - `example_flutter_app.dart` - Flutter application example with UI
+- `example_large_table.dart` - Processing large tables with 200+ columns
 - `helper.dart` - Helper class for testing and examples
 
 To run an example:

@@ -1,5 +1,12 @@
 ## UNRELEASED
 
+### New Features
+- **Added**: Helper function `execLargeTable()` in `TestHelper` for processing tables with 200+ columns
+  - Automatically groups columns to avoid driver memory allocation failures (HY001)
+  - Auto-detects primary key for merging results
+  - Includes fallback pagination for problematic column groups
+  - See `test/test_helper.dart` for implementation details
+
 ### Breaking Changes
 - **REMOVED**: Automatic `SELECT *` to `CAST AS NVARCHAR(MAX)` transformation
   - This transformation caused significant performance degradation (2x slower)

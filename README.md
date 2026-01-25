@@ -98,7 +98,7 @@ For large result sets, you can use the `executeCursor` method to stream results 
 final cursor = await odbc.executeCursor('SELECT * FROM LARGE_TABLE');
 try {
   while (true) {
-    final row = await cursor.fetch();
+    final row = await cursor.next();
     if (row is CursorDone) {
       break; // No more rows
     }

@@ -14,6 +14,6 @@ Keep PRs **small and focused**.
 -   PRs that change dozens of files for a single "helper function" will be closed without review.
 
 ## 3. Ethical Use of AI
-While AI tools can assist in writing code, **you are responsible for every line you submit.** * Do not submit unsupervised AI output.
+While AI tools can assist in writing code, **you are responsible for every line you submit.** Do not submit unsupervised AI output.
 -   If it is clear that you have not manually validated, tested, or understood the code you are pushing, the PR will be rejected.
 -   We value human-curated contributions that respect the project's existing structure and logic.

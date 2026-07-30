@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast lane: no database, no Docker. Gives feedback in well under a minute.
+  analyze-and-unit:
+    name: Analyze + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      # `dart pub get` exits non-zero at the repo root because it recurses into
+      # example/, a Flutter app needing the Flutter SDK. It still writes a valid
+      # package_config.json, so tolerate that but verify the real artifact --
+      # otherwise a genuine resolution failure would be masked.
+      - name: Install dependencies
+        run: |
+          dart pub get || echo "pub get warned (example/ needs Flutter); continuing"
+          test -f .dart_tool/package_config.json
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: dart analyze lib test
+
+      # test/unit needs no database.
+      - name: Unit tests
+        run: dart test test/unit
+
+  integration:
+    name: Integration tests (PostgreSQL via ODBC)
+    runs-on: ubuntu-latest
+    needs: analyze-and-unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Cache the apt layer across runs; without this every PR reinstalls
+      # unixODBC and the PostgreSQL ODBC driver.
+      - name: Build runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.tests
+          load: true
+          tags: dart_odbc-tests:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # `run` rather than `up`, so this step's exit code IS the test exit code.
+      # No --build flag: `compose run` reuses the image tagged above instead of
+      # rebuilding, which is what keeps the layer cache worthwhile.
+      - name: Integration tests
+        run: docker compose run --rm tests
+
+      - name: Database logs on failure
+        if: failure()
+        run: docker compose logs db
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

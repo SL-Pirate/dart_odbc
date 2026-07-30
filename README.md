@@ -201,29 +201,73 @@ This package has been tested to be working on the following Database Servers
 - Oracle
 - MariaDB / MySQL
 
-### Local testing
+### Running the tests (recommended)
 
-This gives an overview of how you can set up the environment for testing with SQL Server on Linux. For Windows or macOS, please check out the official documentation from Microsoft mentioned above.
+The test suite is fully containerized. **Docker is the only prerequisite** — you
+do not need to install unixODBC, an ODBC driver, or a database on your machine.
 
-#### Getting SQL server up and running
+```bash
+docker compose run --rm tests
+```
 
-1. Get a working SQL Server. For this you can use a SQL Server instance from a managed provider or install it locally or on Docker.
-2. For docker setup check out [this guide](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?tabs=cli&pivots=cs1-bash)
+That starts PostgreSQL, waits until it is accepting connections, seeds the test
+schema, and runs the full suite inside an image that already has the driver
+manager and the PostgreSQL ODBC driver installed.
 
-#### Setting up `unixodbc` and the Microsoft SQL Server ODBC driver
+A `Makefile` wraps the common tasks:
 
-- For this, you can follow this [detailed guide](https://poweradm.com/connect-ms-sql-server-from-linux-odbc/)
+```bash
+make test                 # full suite in containers
+make test-unit            # DB-free unit tests, natively (fastest loop)
+make test-file FILE=test/integration/query_test.dart
+make shell                # shell in the ODBC environment, for debugging
+make db                   # start only the database
+make down                 # stop everything
+```
 
-#### Setting up the environment variables and the testing database.
+The tests exercise the ODBC/FFI layer rather than any one vendor's SQL dialect,
+so PostgreSQL is used as the verified target: its ODBC driver installs from the
+standard distribution repositories with no licence acceptance, and its container
+image runs natively on both `x86_64` and `arm64`.
 
-1. Simply create a file `.env` in the project root, copy the content from the `test.env` to it and set the required variables according to your setup.
-2. Connect to your SQL server and execute the commands in the `test/testdb.sql` file which will initialize the `odbc_test` database (or you can name this database any name and override it in the `.env`) which will be used for testing.
+#### Debugging a connection problem
 
-#### Run the tests
+`make shell` drops you into the runner image, where `isql` can test the ODBC
+layer directly, without Dart in the picture:
 
-- Simply execute the following command to run the tests with `dart cli`
+```bash
+isql -v postgres odbc_test odbc_test
+```
+
+If `isql` connects but the Dart tests fail, the problem is in the FFI layer. If
+both fail, the problem is in the ODBC configuration.
+
+#### Writing tests or targeting another database
+
+See [`test/README.md`](test/README.md) for the suite's internals: how to add a
+test, and how to run it against a database engine other than PostgreSQL.
+
+### Testing against your own database
+
+You can still run the suite natively against a database you manage. This
+requires the manual setup that the container image otherwise handles for you:
+
+1. Install a driver manager (`unixodbc`) and an ODBC driver for your database.
+   On Debian/Ubuntu, `unixodbc-dev` is required — it provides the unversioned
+   `libodbc.so` that this package loads.
+2. Register a DSN in your `odbc.ini`. For SQL Server on Linux, see
+   [this guide](https://poweradm.com/connect-ms-sql-server-from-linux-odbc/);
+   for a Docker-hosted SQL Server, see
+   [Microsoft's quickstart](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker?tabs=cli&pivots=cs1-bash).
+3. Copy `test.env` to `.env` and set the values to match your setup.
+4. Create the test schema. `test/schema/postgres.sql` holds the fixtures;
+   adapt the types for another engine.
+5. Run the tests:
 
 > $ dart test
+
+To run natively against just the containerized database, use `make db` and point
+your DSN at `localhost:15432`.
 
 ## Support for other Database Servers
 

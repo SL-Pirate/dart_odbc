@@ -1,0 +1,68 @@
+# Zero-setup integration test environment.
+#
+#   docker compose run --rm tests
+#
+# Two services on one network: the database, and a runner image that has the
+# ODBC driver manager plus the PostgreSQL ODBC driver baked in. No Docker socket
+# is mounted and no privileged mode is used.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: odbc_test
+      POSTGRES_USER: odbc_test
+      POSTGRES_PASSWORD: odbc_test
+    # `dart test` runs suites concurrently and each opens its own connection;
+    # cursor_test.dart adds 3 more clients on top. Be explicit so this cannot
+    # silently regress into connection-exhaustion flakes.
+    command: ["postgres", "-c", "max_connections=200"]
+    volumes:
+      # Schema for this engine. Each dialect in test/support/test_database.dart
+      # has a matching file in test/schema/.
+      - ./test/schema/postgres.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    # tmpfs guarantees an empty data dir on every run. This is deliberate:
+    # /docker-entrypoint-initdb.d only runs when the data directory is empty, so
+    # a persistent volume would seed once and then silently skip forever -- a
+    # confusing "my schema change did nothing" bug.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      # Mandatory. The library never sets SQL_ATTR_LOGIN_TIMEOUT, so connecting
+      # to a not-yet-ready server blocks indefinitely instead of failing fast.
+      # depends_on: service_healthy below is what prevents that hang.
+      test: ["CMD-SHELL", "pg_isready -U odbc_test -d odbc_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
+    ports:
+      # Non-default host port so this cannot collide with a local PostgreSQL.
+      # Also enables running `dart test` natively against the container.
+      - "${PGPORT:-15432}:5432"
+
+  tests:
+    # Named explicitly so CI can prebuild this exact tag with a warm layer
+    # cache and then run with --no-build.
+    image: dart_odbc-tests:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DSN: postgres
+      DB_USER: odbc_test
+      DB_PASSWORD: odbc_test
+      DB_NAME: odbc_test
+    volumes:
+      # Live source: edit on the host, rerun, no rebuild.
+      - .:/app
+      # Named volumes shadow the bind mount so the host's .dart_tool (built
+      # against a different SDK) and pub cache never leak into the container.
+      - pub-cache:/root/.pub-cache
+      - dart-tool:/app/.dart_tool
+
+volumes:
+  pub-cache:
+  dart-tool:

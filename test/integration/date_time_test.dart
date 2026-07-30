@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -10,14 +11,11 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('date time support test', () async {
-    final results = await helper.exec(
-      '''
-        SELECT * FROM USERS
-        WHERE BIRTHDAY = ?
-      ''',
-      params: [
-        DateTime(1999, 5, 12),
-      ],
+    final results = await helper.run(
+      Sql.selectUsersByBirthday,
+      // Routed through the dialect: drivers differ on whether a date column
+      // accepts a bound DateTime directly.
+      params: [helper.dialect.dateParam(DateTime(1999, 5, 12))],
     );
 
     expect(results.length, 1);

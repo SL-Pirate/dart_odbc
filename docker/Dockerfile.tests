@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+#
+# Test runner image. The test PROCESS needs the ODBC driver, not just the
+# database: discoverDriver() calls DynamicLibrary.open('libodbc.so') in-process,
+# and unixODBC resolves the vendor driver via /etc/odbcinst.ini. That is why
+# containerizing only the database is not enough.
+#
+# Layers are ordered by volatility so the expensive apt layer is paid once.
+FROM dart:stable
+
+# unixodbc-dev provides the UNVERSIONED libodbc.so that discoverDriver()
+# dlopen()s -- the runtime package alone ships only libodbc.so.2 and is not
+# enough. unixodbc ships isql, which is the fastest way to tell a config
+# problem apart from an FFI problem.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      unixodbc \
+      unixodbc-dev \
+      odbc-postgresql \
+      postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
+
+# odbc-postgresql self-registers /etc/odbcinst.ini, so we only add the DSN.
+COPY docker/odbc.ini /etc/odbc.ini
+
+# Fail at BUILD time rather than mid-test-run if the driver is missing or the
+# package layout changed upstream.
+RUN odbcinst -q -d | grep -q 'PostgreSQL Unicode' \
+ && test -e /usr/lib/*/libodbc.so
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+WORKDIR /app
+
+# Source is deliberately NOT copied: docker-compose bind-mounts the working
+# tree, so editing a test needs no rebuild.
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["dart", "test"]

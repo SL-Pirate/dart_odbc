@@ -1,0 +1,7 @@
+# Integration suites open real ODBC connections; the first run in a cold
+# container is slower than the 30s default allows.
+timeout: 90s
+
+tags:
+  visual:
+    skip: "Opens a GUI image viewer; run explicitly with -t visual"

@@ -1,5 +1,4 @@
 import 'package:dart_odbc/dart_odbc.dart';
-import 'package:dotenv/dotenv.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
@@ -19,13 +18,15 @@ void main() {
     );
   });
 
-  late DotEnv env;
+  // Configuration comes from TestHelper, which resolves it once in its
+  // constructor. Previously this file loaded its own DotEnv.
+  late TestHelper config;
   late TestHelper helper;
   late TestHelper connStrHelper;
 
   setUpAll(() {
-    env = DotEnv()..load(['.env']);
-    helper = TestHelper(DartOdbc(dsn: env['DSN']));
+    config = TestHelper();
+    helper = TestHelper(DartOdbc(dsn: config.dsn));
     connStrHelper = TestHelper(DartOdbc());
   });
 
@@ -34,22 +35,24 @@ void main() {
     await connStrHelper.disconnect();
   });
 
+  // Exercises SQLConnectW, which accepts only a DSN name registered in
+  // odbc.ini -- never a host/port pair.
   test('connects and disconnects successfully using DSN', () async {
     await helper.connect(
-      username: env['USERNAME']!,
-      password: env['PASSWORD']!,
-      database: env['DATABASE'],
+      username: config.username,
+      password: config.password,
+      database: config.database,
     );
 
     expect(true, isTrue);
   });
 
+  // Exercises SQLDriverConnectW, which accepts a full connection string.
   test('connects successfully using connection string', () async {
     final connectionString = [
-      'DSN=${env['DSN']}',
-      'UID=${env['USERNAME']}',
-      'PWD=${env['PASSWORD']}',
-      if (env['DATABASE'] != null) 'DATABASE=${env['DATABASE']}',
+      'DSN=${config.dsn}',
+      'UID=${config.username}',
+      'PWD=${config.password}',
     ].join(';');
 
     // This is intentional for logging purposes

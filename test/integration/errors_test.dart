@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -10,15 +11,8 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('invalid SQL throws', () async {
-    // try {
-    //   final result = await helper.query('SELECT * FROM DOES_NOT_EXIST');
-    //   print(result);
-    // } catch (e) {
-    //   print('Caught exception: $e');
-    // }
-
     expect(
-      () => helper.exec('SELECT * FROM DOES_NOT_EXIST'),
+      () => helper.run(Sql.selectFromMissingTable),
       throwsA(isA<Exception>()),
     );
   });

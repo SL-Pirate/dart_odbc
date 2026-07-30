@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -13,18 +14,15 @@ void main() {
     const uid = 1001;
 
     // Ensure clean state (idempotent)
-    await helper.exec(
-      'DELETE FROM USERS WHERE UID = ?',
-      params: [uid],
-    );
+    await helper.run(Sql.deleteUserById, params: [uid]);
 
-    await helper.exec(
-      'INSERT INTO USERS (UID, NAME, DESCRIPTION) VALUES (?, ?, ?)',
+    await helper.run(
+      Sql.insertUser,
       params: [uid, 'Charlie', 'Inserted from test'],
     );
 
-    final result = await helper.exec(
-      'SELECT NAME, DESCRIPTION FROM USERS WHERE UID = ?',
+    final result = await helper.run(
+      Sql.selectUserNameAndDescriptionById,
       params: [uid],
     );
 

@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -10,7 +11,7 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('simple select returns rows', () async {
-    final result = await helper.exec('SELECT * FROM USERS');
+    final result = await helper.run(Sql.selectAllUsers);
 
     expect(result, isA<List<Map<String, dynamic>>>());
     expect(result.isNotEmpty, true);

@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -11,10 +12,7 @@ void main() {
 
   test('parallel async query test', () async {
     final futures = List.generate(10, (index) {
-      return helper.exec(
-        'SELECT ? AS index_value;',
-        params: [index],
-      );
+      return helper.run(Sql.echoParameter, params: [index]);
     });
 
     final results = await Future.wait(futures);

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:open_url/open_url.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -14,29 +15,36 @@ void main() {
 
   tearDownAll(helper.disconnect);
   tearDownAll(() async {
-    // Give user time to see it
-    await Future<void>.delayed(const Duration(seconds: 10));
-
-    // Cleanup
-    await imageFile.delete();
+    if (imageFile.existsSync()) {
+      await imageFile.delete();
+    }
   });
 
   test(
-    'query an image from the database, embed it in html and show it to user',
+    'query binary data from the database and write it to a file',
     () async {
-      final imgData = await helper.exec(
-        'SELECT DATA FROM BINARY_TABLE WHERE ID = 1',
+      final imgData = await helper.run(
+        Sql.selectBinaryDataById,
+        params: [1],
       );
       expect(imgData, isNotEmpty);
       expect(imgData.first['DATA'], isA<Uint8List>());
 
-      // Create a Blob from binary data
       final bytes = imgData.first['DATA'] as Uint8List;
 
       // Write image to disk
       await imageFile.writeAsBytes(bytes);
+      expect(imageFile.existsSync(), isTrue);
 
-      await openUrl(imageFile.path);
+      // Opening a viewer and waiting for a human is a developer convenience,
+      // not an assertion. Gate it so the test runs headless in containers and
+      // CI, and does not cost 10 seconds on every run.
+      if (Platform.environment['SHOW_TEST_IMAGE'] == '1') {
+        await openUrl(imageFile.path);
+
+        // Give user time to see it
+        await Future<void>.delayed(const Duration(seconds: 10));
+      }
     },
   );
 }

@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import 'support/test_database.dart';
 import 'test_helper.dart';
 
 void main() {
@@ -13,23 +14,20 @@ void main() {
     const uid = 1002;
 
     // Ensure row exists
-    await helper.exec(
-      'DELETE FROM USERS WHERE UID = ?',
-      params: [uid],
-    );
+    await helper.run(Sql.deleteUserById, params: [uid]);
 
-    await helper.exec(
-      'INSERT INTO USERS (UID, NAME, DESCRIPTION) VALUES (?, ?, ?)',
+    await helper.run(
+      Sql.insertUser,
       params: [uid, 'Dana', 'Before update'],
     );
 
-    await helper.exec(
-      'UPDATE USERS SET DESCRIPTION = ? WHERE UID = ?',
+    await helper.run(
+      Sql.updateUserDescriptionById,
       params: ['After update', uid],
     );
 
-    final result = await helper.exec(
-      'SELECT DESCRIPTION FROM USERS WHERE UID = ?',
+    final result = await helper.run(
+      Sql.selectUserDescriptionById,
       params: [uid],
     );
 

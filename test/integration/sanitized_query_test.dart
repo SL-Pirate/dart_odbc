@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import '../test_helper.dart';
 
 void main() {
@@ -10,8 +11,8 @@ void main() {
   tearDownAll(helper.disconnect);
 
   test('parameterized query works', () async {
-    final result = await helper.exec(
-      'SELECT NAME FROM USERS WHERE UID = ?',
+    final result = await helper.run(
+      Sql.selectUserNameById,
       params: [1],
     );
 

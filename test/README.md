@@ -14,12 +14,14 @@ test/
 ├── integration/           Real ODBC connections against a live database.
 ├── update_test.dart       Integration test (kept here for historical reasons).
 ├── test_helper.dart       Connection lifecycle + the run()/sql() entry points.
-├── schema/
-│   └── postgres.sql       Fixtures per engine, named after the dialect.
+├── schema/                Fixtures per engine, named after the dialect.
+│   ├── postgres.sql
+│   └── mariadb.sql
 └── support/
     ├── test_database.dart The Sql keys and the TestDatabase contract.
-    └── impl/
-        └── test_database_postgres_dialect.dart   One dialect per file.
+    └── impl/              One dialect per file.
+        ├── test_database_postgres_dialect.dart
+        └── test_database_mariadb_dialect.dart
 ```
 
 `test/unit` needs nothing installed and runs in about a second — use it for
@@ -111,8 +113,20 @@ you add a column, quote it in the schema too.
 
 ## Targeting another database engine
 
-The library supports any engine with an ODBC driver, but CI verifies PostgreSQL.
+The library works with any engine that has an ODBC driver. CI verifies
+**PostgreSQL and MariaDB** — two engines with genuinely different quoting,
+database selection, and binary types — which is what keeps the abstraction
+honest rather than merely aspirational.
+
+```bash
+make test           # PostgreSQL
+make test-mariadb   # MariaDB, same suite, no test file changes
+make test-all       # both
+```
+
 Adding another engine takes five steps and **no changes to any test file**.
+`support/impl/test_database_mariadb_dialect.dart` is the worked example to copy;
+read it alongside the PostgreSQL one to see what actually varies.
 
 ### 1. Write the dialect
 
@@ -123,7 +137,7 @@ Add `support/impl/test_database_<name>_dialect.dart` as a `part` of
 part 'impl/test_database_<name>_dialect.dart';
 ```
 
-Then translate every `Sql` key. For SQL Server:
+Then translate every `Sql` key. Sketched for SQL Server:
 
 ```dart
 part of '../test_database.dart';
@@ -134,13 +148,14 @@ class SqlServerDialect extends TestDatabase {
   @override
   String get name => 'sqlserver';
 
-  // T-SQL brackets rather than double quotes.
+  // T-SQL brackets, where PostgreSQL uses double quotes and MariaDB backticks.
   @override
   String id(String raw) => '[$raw]';
 
-  // T-SQL selects a database with a statement, unlike PostgreSQL.
+  // T-SQL selects a database with a statement, as MariaDB does; PostgreSQL
+  // selects it at connect time and returns null here.
   @override
-  String? useDatabase(String database) => 'USE $database';
+  String? useDatabase(String database) => 'USE ${id(database)}';
 
   @override
   String sql(Sql key) => switch (key) {
@@ -154,21 +169,29 @@ Only `name`, `sql` and `id` are required. `useDatabase`, `dateParam` and
 `schemaPath` have defaults on `TestDatabase` — override them only when the engine
 differs.
 
-Watch out for these, which is where engines actually diverge:
+Watch out for these, which is where the two existing dialects actually diverge:
 
-- **Identifier quoting and case folding.** `"X"` in PostgreSQL, `[X]` in T-SQL,
-  backticks in MySQL. Getting this wrong changes every returned column key.
-- **Binary columns.** `BYTEA` vs `VARBINARY` vs `BLOB`, and whether the driver
-  reports them as a binary type at all. If `binary_test` gets a `String` instead
-  of a `Uint8List`, the driver is reporting the column as text — usually fixable
-  with a driver option in `docker/odbc.ini` rather than in Dart.
+- **Identifier quoting and case folding.** `"X"` in PostgreSQL, `` `X` `` in
+  MariaDB, `[X]` in T-SQL. Get this wrong and every returned column key changes.
+  Both current schemas use quoted upper case so the assertions match; note that
+  MariaDB only preserves table-name case when `lower_case_table_names=0`, which
+  is the default on Linux but not on macOS or Windows.
+- **Database selection.** PostgreSQL selects at connect time (`useDatabase`
+  returns `null`); MariaDB and SQL Server use a `USE` statement.
+- **Binary columns.** `BYTEA` in PostgreSQL, `VARBINARY` in MariaDB, and whether
+  the driver reports them as a binary type at all. If `binary_test` gets a
+  `String` instead of a `Uint8List`, the driver is reporting the column as text —
+  usually fixed with a driver option in `docker/odbc.ini`, not in Dart.
+  PostgreSQL needs `ByteaAsLongVarBinary=1`; MariaDB needs nothing.
 - **Untyped parameters.** Some engines cannot infer the type of a bare `?` and
-  need an explicit cast in the statement.
+  need an explicit cast. Both current engines bind it fine.
 - **Date binding.** `DateTime` binds as a timestamp; engines vary on comparing
   that against a date column. Override `dateParam` if needed.
 - **A long-text query.** `selectLongText` must return more than 4096 characters
-  or the incremental `SQLGetData` path is never exercised and that test silently
-  stops testing anything.
+  or the incremental `SQLGetData` path is never exercised and the test silently
+  stops testing anything. This bites easily: PostgreSQL's `version()` is ~88
+  characters and MariaDB's is ~22, so both dialects repeat it to clear the
+  buffer. Check the length rather than assuming.
 
 ### 2. Register it
 
@@ -177,6 +200,9 @@ Add a case to `TestDatabase.resolve()` in `support/test_database.dart`:
 ```dart
 'sqlserver' => const SqlServerDialect(),
 ```
+
+An unrecognised `TEST_DB` fails immediately with a message naming what to do, so
+a half-registered dialect cannot silently fall back to PostgreSQL.
 
 ### 3. Add the schema
 
@@ -194,20 +220,32 @@ Note that the driver has to be installed in the **runner image**, not the
 database container: the library calls `DynamicLibrary.open('libodbc.so')`
 in-process, so the driver must be present wherever the Dart process runs.
 
-### 5. Add the compose service
+### 5. Add the compose services
 
-Add the database service to `docker-compose.yml`, mount `schema/<name>.sql`, and
-give it a healthcheck. The healthcheck is required, not cosmetic: the library
-never sets a login timeout, so connecting to a database that is not yet accepting
-connections blocks indefinitely instead of failing.
+Add two services to `docker-compose.yml`, both behind a `profiles: ["<name>"]`
+entry so the default run stays a single database:
+
+- the database itself, mounting `schema/<name>.sql` into
+  `/docker-entrypoint-initdb.d/` and declaring a **healthcheck**;
+- a runner, copying the `tests` service but with `TEST_DB` and `DSN` set to your
+  engine and `depends_on` pointing at your database with
+  `condition: service_healthy`.
+
+The healthcheck is required, not cosmetic: the library never sets a login
+timeout, so connecting to a database that is not yet accepting connections blocks
+indefinitely rather than failing. A separate runner service is needed because
+`depends_on` cannot be varied per invocation.
+
+Mirror the `mariadb` and `tests-mariadb` pair — it is exactly this shape.
 
 ### Then run it
 
 ```bash
-TEST_DB=<name> docker compose run --rm tests
+docker compose --profile <name> run --rm tests-<name>
 ```
 
-An unrecognised `TEST_DB` fails immediately with a message naming what to do.
+Add a `test-<name>` target to the `Makefile` and a matrix entry to
+`.github/workflows/ci.yml` so CI covers it too.
 
 ## Debugging
 
@@ -215,7 +253,8 @@ An unrecognised `TEST_DB` fails immediately with a message naming what to do.
 database without Dart in the picture:
 
 ```bash
-isql -v postgres odbc_test odbc_test
+isql -v postgres odbc_test odbc_test   # or: isql -v mariadb odbc_test odbc_test
+odbcinst -q -d                         # which drivers are registered
 ```
 
 This is the fastest way to split a problem in two. If `isql` connects and the

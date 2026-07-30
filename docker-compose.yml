@@ -1,10 +1,15 @@
 # Zero-setup integration test environment.
 #
-#   docker compose run --rm tests
+#   docker compose run --rm tests                          # PostgreSQL (default)
+#   docker compose --profile mariadb run --rm tests-mariadb # MariaDB
 #
-# Two services on one network: the database, and a runner image that has the
-# ODBC driver manager plus the PostgreSQL ODBC driver baked in. No Docker socket
-# is mounted and no privileged mode is used.
+# A database service plus a runner image with the ODBC driver manager and both
+# vendor drivers baked in. No Docker socket is mounted and no privileged mode is
+# used.
+#
+# The runner needs the driver because the library calls
+# DynamicLibrary.open('libodbc.so') in-process -- containerizing only the
+# database would leave the driver install on the host.
 services:
   db:
     image: postgres:16-alpine
@@ -40,9 +45,32 @@ services:
       # Also enables running `dart test` natively against the container.
       - "${PGPORT:-15432}:5432"
 
+  mariadb:
+    image: mariadb:11
+    profiles: ["mariadb"]
+    environment:
+      MARIADB_DATABASE: odbc_test
+      MARIADB_USER: odbc_test
+      MARIADB_PASSWORD: odbc_test
+      MARIADB_ROOT_PASSWORD: root
+    volumes:
+      - ./test/schema/mariadb.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      # healthcheck.sh ships with the mariadb image. As above, this gate is what
+      # keeps a premature connect from hanging.
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+      start_period: 5s
+    ports:
+      - "${MARIADBPORT:-13306}:3306"
+
   tests:
-    # Named explicitly so CI can prebuild this exact tag with a warm layer
-    # cache and then run with --no-build.
+    # Named explicitly so CI can prebuild this exact tag with a warm layer cache
+    # and then run without rebuilding.
     image: dart_odbc-tests:latest
     build:
       context: .
@@ -51,6 +79,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      TEST_DB: postgres
       DSN: postgres
       DB_USER: odbc_test
       DB_PASSWORD: odbc_test
@@ -60,6 +89,28 @@ services:
       - .:/app
       # Named volumes shadow the bind mount so the host's .dart_tool (built
       # against a different SDK) and pub cache never leak into the container.
+      - pub-cache:/root/.pub-cache
+      - dart-tool:/app/.dart_tool
+
+  # Same image and source mount as `tests`, pointed at MariaDB. A separate
+  # service rather than an override because depends_on cannot be varied per run.
+  tests-mariadb:
+    image: dart_odbc-tests:latest
+    profiles: ["mariadb"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      TEST_DB: mariadb
+      DSN: mariadb
+      DB_USER: odbc_test
+      DB_PASSWORD: odbc_test
+      DB_NAME: odbc_test
+    volumes:
+      - .:/app
       - pub-cache:/root/.pub-cache
       - dart-tool:/app/.dart_tool
 

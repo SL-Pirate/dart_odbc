@@ -14,6 +14,7 @@
 
 import 'dart:io';
 
+part 'impl/test_database_mariadb_dialect.dart';
 part 'impl/test_database_postgres_dialect.dart';
 
 /// Keys for every statement the integration suite needs.
@@ -97,6 +98,7 @@ abstract class TestDatabase {
 
     return switch (requested) {
       'postgres' => const PostgresDialect(),
+      'mariadb' => const MariaDbDialect(),
       _ => throw UnsupportedError(
           'Unknown TEST_DB "$requested". Implement TestDatabase, add a case '
           'here, and provide a matching schema file.',

@@ -197,9 +197,10 @@ Native ODBC methods can be executed via the `LibOdbc` class.
 
 This package has been tested to be working on the following Database Servers
 
+- PostgreSQL — verified in CI on every change
+- MariaDB / MySQL — verified in CI on every change
 - Microsoft SQL Server
 - Oracle
-- MariaDB / MySQL
 
 ### Running the tests (recommended)
 
@@ -212,12 +213,14 @@ docker compose run --rm tests
 
 That starts PostgreSQL, waits until it is accepting connections, seeds the test
 schema, and runs the full suite inside an image that already has the driver
-manager and the PostgreSQL ODBC driver installed.
+manager and the ODBC drivers installed.
 
 A `Makefile` wraps the common tasks:
 
 ```bash
-make test                 # full suite in containers
+make test                 # full suite against PostgreSQL
+make test-mariadb         # same suite against MariaDB
+make test-all             # both engines
 make test-unit            # DB-free unit tests, natively (fastest loop)
 make test-file FILE=test/integration/query_test.dart
 make shell                # shell in the ODBC environment, for debugging
@@ -226,9 +229,10 @@ make down                 # stop everything
 ```
 
 The tests exercise the ODBC/FFI layer rather than any one vendor's SQL dialect,
-so PostgreSQL is used as the verified target: its ODBC driver installs from the
-standard distribution repositories with no licence acceptance, and its container
-image runs natively on both `x86_64` and `arm64`.
+so the suite is dialect-agnostic and CI runs it against **PostgreSQL and
+MariaDB**. Both drivers install from the standard distribution repositories with
+no licence acceptance, and both database images run natively on `x86_64` and
+`arm64`.
 
 #### Debugging a connection problem
 

@@ -12,19 +12,25 @@ FROM dart:stable
 # dlopen()s -- the runtime package alone ships only libodbc.so.2 and is not
 # enough. unixodbc ships isql, which is the fastest way to tell a config
 # problem apart from an FFI problem.
+# Both ODBC drivers come from the standard Debian repositories -- no
+# third-party feed and no licence acceptance. mariadb-client ships the `mariadb`
+# CLI, the counterpart to psql for debugging.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       unixodbc \
       unixodbc-dev \
       odbc-postgresql \
+      odbc-mariadb \
       postgresql-client \
+      mariadb-client \
  && rm -rf /var/lib/apt/lists/*
 
 # odbc-postgresql self-registers /etc/odbcinst.ini, so we only add the DSN.
 COPY docker/odbc.ini /etc/odbc.ini
 
-# Fail at BUILD time rather than mid-test-run if the driver is missing or the
+# Fail at BUILD time rather than mid-test-run if a driver is missing or the
 # package layout changed upstream.
 RUN odbcinst -q -d | grep -q 'PostgreSQL Unicode' \
+ && odbcinst -q -d | grep -q 'MariaDB Unicode' \
  && test -e /usr/lib/*/libodbc.so
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

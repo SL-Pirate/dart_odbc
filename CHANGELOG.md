@@ -117,3 +117,8 @@
 
 - Implemented non-blocking ODBC operations using isolates.
 - Made the new non-blocking ODBC implementation the default, while keeping the previous blocking implementation available as `DartOdbcBlockingClient` for users who still need blocking behavior.
+
+## 6.2.1
+
+- Chore: Updated ffi dependency version to 2.1.2
+- Feat: Implemented a more robust testing framework for the library, including ready to test docker containers for various databases (MySQL, PostgreSQL, SQL Server, Oracle, and SQLite). This allows for easier testing and validation of the library against different database systems.

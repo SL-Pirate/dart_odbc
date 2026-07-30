@@ -1,11 +1,16 @@
-.PHONY: help test test-unit test-file shell db down rebuild fmt
+.PHONY: help test test-mariadb test-all test-unit test-file shell db down rebuild fmt
 
 help:
 	@grep -E '^[a-zA-Z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-test: ## Run the full suite in containers (the only command you need)
+test: ## Run the full suite against PostgreSQL (the default)
 	docker compose run --rm tests
+
+test-mariadb: ## Run the same suite against MariaDB
+	docker compose --profile mariadb run --rm tests-mariadb
+
+test-all: test test-mariadb ## Run the suite against every supported engine
 
 test-unit: ## Run DB-free unit tests natively (fastest feedback loop)
 	dart test test/unit

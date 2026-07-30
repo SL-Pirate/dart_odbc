@@ -41,9 +41,21 @@ jobs:
         run: dart test test/unit
 
   integration:
-    name: Integration tests (PostgreSQL via ODBC)
+    name: Integration tests (${{ matrix.engine }} via ODBC)
     runs-on: ubuntu-latest
     needs: analyze-and-unit
+    strategy:
+      # Run every engine even when one fails -- a dialect-specific failure is
+      # the most useful signal this matrix produces.
+      fail-fast: false
+      matrix:
+        include:
+          - engine: postgres
+            service: tests
+            profile: ""
+          - engine: mariadb
+            service: tests-mariadb
+            profile: "--profile mariadb"
     steps:
       - uses: actions/checkout@v4
 
@@ -65,12 +77,12 @@ jobs:
       # No --build flag: `compose run` reuses the image tagged above instead of
       # rebuilding, which is what keeps the layer cache worthwhile.
       - name: Integration tests
-        run: docker compose run --rm tests
+        run: docker compose ${{ matrix.profile }} run --rm ${{ matrix.service }}
 
       - name: Database logs on failure
         if: failure()
-        run: docker compose logs db
+        run: docker compose ${{ matrix.profile }} logs
 
       - name: Tear down
         if: always()
-        run: docker compose down -v
+        run: docker compose ${{ matrix.profile }} down -v

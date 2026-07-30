@@ -17,7 +17,7 @@ dependencies:
 
 dev_dependencies:
   dotenv: ^4.2.0
-  ffigen: ^20.1.1
+  ffigen: ">=20.1.1 <22.0.0"
   lints: ^6.0.0
   open_url: ^2.0.1
   test: ^1.24.0

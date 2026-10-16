@@ -1,85 +1,36 @@
-## 1.0.0
+## 6.2.2
 
-- Initial version.
+- Upgraded ffi dependency.
+- Added support for testing with Podman.
+- Fixed some analysis warnings
 
-## 1.0.1+1
+## 6.2.1
 
-- Improved memory management with the ffi
+- Chore: Updated ffi dependency version to 2.1.2
+- Feat: Implemented a more robust testing framework for the library, including ready to test docker containers for various databases (MySQL, PostgreSQL, SQL Server, Oracle, and SQLite). This allows for easier testing and validation of the library against different database systems.
 
-## 1.0.2+1
+## 6.2.0
 
-- Renamed low level API class from api/sql to ffi/libodbc and renamed the class to LibODBC
+- Implemented non-blocking ODBC operations using isolates.
+- Made the new non-blocking ODBC implementation the default, while keeping the previous blocking implementation available as `DartOdbcBlockingClient` for users who still need blocking behavior.
 
-## 1.1.0+1
+## 6.1.0
 
-- Implemented sanitization of sql queries using prepared statements
+- Implemented streaming support for query results. Now `DartOdbc.executeCursor` can be used to stream large result sets without loading everything into memory at once.
 
-## 1.1.1+1
+## 6.0.1
 
-- Improved exception handeling
-- Made setting up OSBC version optional.
-- Verified functionality with Oracle
+- Removed unnecessary parameter setting for SQLBindParameter Column Size
 
-## 1.1.1+2
+## 6.0.0
 
-- Updated documentation
+- Added support for `DateTime` input for sanitized input.
+- Removed `ColumnConfig`. The data types will now be auto detected.
+- Various Performance and memory safety improvements.
 
-## 1.2.0+1
+## 5.0.1
 
-- Implemented `removeWhitespaceUnicodes` method to remove unicode whitespace characters on some platforms with some drivers (Thanks to [Salah Sonbol](https://github.com/MrXen3))
-
-## 2.0.0+1
-
-- Exposed availability to configure data types and size for each column in the result set
-
-## 2.1.0+1
-
-- Fixed bug where result set contains unicoded whitespace characters leading to problems with fetching values from result set using column  name and appearing weired symbols when showing values as text
-
-## 3.0.0+1
-
-- Implemented asynchronos support. No `connect`, `disconnect` and `execute` returns Futures!
-
-## 3.0.0+2
-
-- Updated documentation
-
-## 3.1.0+1
-
-- Implemented Implemented `connectWithConnectionString` and `getTables` methods (#6) (Thanks to [Paul-creator](https://github.com/Paul-creator))
-
-## 3.1.1+1
-
-- Added some missed commits
-
-## 3.1.2+1
-
-- Stopped using `columnConfig`'s `type` property as it is known to cause problems with how the data is transformed. Property is not removed for backwards compatibility but is not used anymore.
-
-## 3.1.2+2
-
-- Updated readme
-
-## 4.0.0+1
-
-- Implemented auto detecting odbc driver from driver manager
-
-## 4.1.0+1
-
-- Implemented `DartOdbcUtf8` class for handling utf8
-
-## 4.1.1+1
-
-- Improved auto-detecting drivers on windows
-
-## 4.1.2+1
-
-- Major bug fixes for most of the issues
-- Implemented using driver manager as a middleware
-
-## 4.2.0+1
-
-- Implemented better support for working with binary data
+- Fixed some minor issues flagged by pana test
 
 ## 5.0.0
 
@@ -95,30 +46,85 @@
 - Result fetching now follows the ODBC streaming model (incremental SQLGetData reads), eliminating truncation issues and improving correctness for large values.
 - Column buffer sizing is now treated as a per-chunk fetch hint rather than a hard size limit.
 
-## 5.0.1
+## 4.2.0+1
 
-- Fixed some minor issues flagged by pana test
+- Implemented better support for working with binary data
 
-## 6.0.0
+## 4.1.2+1
 
-- Added support for `DateTime` input for sanitized input.
-- Removed `ColumnConfig`. The data types will now be auto detected.
-- Various Performance and memory safety improvements.
+- Major bug fixes for most of the issues
+- Implemented using driver manager as a middleware
 
-## 6.0.1
+## 4.1.1+1
 
-- Removed unnecessary parameter setting for SQLBindParameter Column Size
+- Improved auto-detecting drivers on windows
 
-## 6.1.0
+## 4.1.0+1
 
-- Implemented streaming support for query results. Now `DartOdbc.executeCursor` can be used to stream large result sets without loading everything into memory at once.
+- Implemented `DartOdbcUtf8` class for handling utf8
 
-## 6.2.0
+## 4.0.0+1
 
-- Implemented non-blocking ODBC operations using isolates.
-- Made the new non-blocking ODBC implementation the default, while keeping the previous blocking implementation available as `DartOdbcBlockingClient` for users who still need blocking behavior.
+- Implemented auto detecting odbc driver from driver manager
 
-## 6.2.1
+## 3.1.2+2
 
-- Chore: Updated ffi dependency version to 2.1.2
-- Feat: Implemented a more robust testing framework for the library, including ready to test docker containers for various databases (MySQL, PostgreSQL, SQL Server, Oracle, and SQLite). This allows for easier testing and validation of the library against different database systems.
+- Updated readme
+
+## 3.1.2+1
+
+- Stopped using `columnConfig`'s `type` property as it is known to cause problems with how the data is transformed. Property is not removed for backwards compatibility but is not used anymore.
+
+## 3.1.1+1
+
+- Added some missed commits
+
+## 3.1.0+1
+
+- Implemented Implemented `connectWithConnectionString` and `getTables` methods (#6) (Thanks to [Paul-creator](https://github.com/Paul-creator))
+
+## 3.0.0+2
+
+- Updated documentation
+
+## 3.0.0+1
+
+- Implemented asynchronos support. No `connect`, `disconnect` and `execute` returns Futures!
+
+## 2.1.0+1
+
+- Fixed bug where result set contains unicoded whitespace characters leading to problems with fetching values from result set using column  name and appearing weired symbols when showing values as text
+
+## 2.0.0+1
+
+- Exposed availability to configure data types and size for each column in the result set
+
+## 1.2.0+1
+
+- Implemented `removeWhitespaceUnicodes` method to remove unicode whitespace characters on some platforms with some drivers (Thanks to [Salah Sonbol](https://github.com/MrXen3))
+
+## 1.1.1+2
+
+- Updated documentation
+
+## 1.1.1+1
+
+- Improved exception handeling
+- Made setting up OSBC version optional.
+- Verified functionality with Oracle
+
+## 1.1.0+1
+
+- Implemented sanitization of sql queries using prepared statements
+
+## 1.0.2+1
+
+- Renamed low level API class from api/sql to ffi/libodbc and renamed the class to LibODBC
+
+## 1.0.1+1
+
+- Improved memory management with the ffi
+
+## 1.0.0
+
+- Initial version.

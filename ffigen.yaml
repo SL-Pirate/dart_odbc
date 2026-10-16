@@ -5,3 +5,4 @@ headers:
   entry-points:
     - "headers/sql.h"
     - "headers/sqlext.h"
+silence-enum-warning: true

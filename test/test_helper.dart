@@ -97,7 +97,7 @@ class TestHelper {
     String sql, {
     List<dynamic> params = const [],
   }) async {
-    return odbc.executeCursor(
+    return await odbc.executeCursor(
       sql,
       params: params,
     );

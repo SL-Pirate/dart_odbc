@@ -57,4 +57,23 @@ if [ ! -f .dart_tool/package_config.json ]; then
   exit 1
 fi
 
+# `docker compose run` honours depends_on's service_healthy gate, but
+# `podman compose run` (podman-compose 1.5) only passes --requires, which
+# starts the database without waiting for its healthcheck. Gate here as well,
+# through the same DSN the tests use, so the runner never races the server.
+# Each attempt is bounded: a half-started server can hang the connect.
+wait_for_dsn() {
+  local attempt
+  for attempt in $(seq 1 60); do
+    if timeout 3 isql -b "$DSN" "$DB_USER" "$DB_PASSWORD" </dev/null >/dev/null 2>&1; then
+      return 0
+    fi
+    [ "$attempt" -eq 1 ] && echo "[entrypoint] waiting for DSN '${DSN}' to accept connections"
+    sleep 1
+  done
+  echo "[entrypoint] ERROR: DSN '${DSN}' did not accept connections within 60s" >&2
+  return 1
+}
+wait_for_dsn
+
 exec "$@"

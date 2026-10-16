@@ -58,7 +58,7 @@ abstract class IsolateClient {
 
     await _ready;
 
-    return bootstrapRequest(payload);
+    return await bootstrapRequest(payload);
   }
 
   /// Sends a request to the worker isolate
@@ -78,7 +78,7 @@ abstract class IsolateClient {
       ).toMap(),
     );
 
-    return completer.future;
+    return await completer.future;
   }
 
   /// Handles incoming messages from the worker isolate.

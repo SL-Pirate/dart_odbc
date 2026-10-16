@@ -62,6 +62,6 @@ extension on DartOdbcBlockingClient {
       ..free(cTableName)
       ..free(cTableType);
 
-    return _getResultBulk(hStmt);
+    return await _getResultBulk(hStmt);
   }
 }

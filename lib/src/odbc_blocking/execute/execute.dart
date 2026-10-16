@@ -11,7 +11,7 @@ extension on DartOdbcBlockingClient {
 
     final hStmt = _execStatement(query, params);
 
-    return _getResultBulk(hStmt);
+    return await _getResultBulk(hStmt);
   }
 
   Future<OdbcCursor> _executeCursor(

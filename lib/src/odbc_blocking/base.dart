@@ -67,7 +67,7 @@ class DartOdbcBlockingClient implements IDartOdbc {
     String? schema,
     String? tableType,
   }) async {
-    return _getTables(
+    return await _getTables(
       tableName: tableName,
       catalog: catalog,
       schema: schema,
@@ -80,7 +80,7 @@ class DartOdbcBlockingClient implements IDartOdbc {
     String query, {
     List<dynamic>? params,
   }) async {
-    return _execute(
+    return await _execute(
       query,
       params: params,
     );

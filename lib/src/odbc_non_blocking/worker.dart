@@ -114,7 +114,7 @@ class OdbcIsolateClient extends IsolateClient {
         return ResponsePayload(result);
 
       case OdbcCommand.executeCursor:
-        return _executeCursor(
+        return await _executeCursor(
           message.arguments['query'] as String,
           message.arguments['params'] as List<dynamic>?,
         );

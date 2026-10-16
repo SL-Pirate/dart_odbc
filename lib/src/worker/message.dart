@@ -36,7 +36,6 @@ class WorkerMessage {
 }
 
 /// Defines the payload of a [WorkerMessage].
-// ignore: one_member_abstracts
 abstract class WorkerMessagePayload {
   /// Creates a new [WorkerMessagePayload].
   WorkerMessagePayload();

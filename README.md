@@ -206,6 +206,8 @@ This package has been tested to be working on the following Database Servers
 
 The test suite is fully containerized. **Docker is the only prerequisite** — you
 do not need to install unixODBC, an ODBC driver, or a database on your machine.
+Podman works too: the `Makefile` uses `podman compose` when `docker` is not
+installed.
 
 ```bash
 docker compose run --rm tests

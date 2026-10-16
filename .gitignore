@@ -14,6 +14,7 @@ windows/
 .idea/
 .flutter-plugins
 .flutter-plugins-dependencies
+.vscode/
 
 # env
 .env
